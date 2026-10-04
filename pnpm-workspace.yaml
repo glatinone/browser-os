@@ -5,6 +5,12 @@ packages:
   - "examples"
   - "tests"
 
+# `packages/browser` devDepends on `@browser-os/tests` for the browser-test helpers and
+# `@browser-os/tests` depends on every package (integration §15), which is a deliberate
+# workspace cycle. pnpm refuses to run recursive tasks across a cycle unless this is set;
+# `tsc -b` orders itself through project references, so the order does not matter.
+ignoreWorkspaceCycles: true
+
 # pnpm 12 blocks dependency build scripts by default and uses `allowBuilds`
 # (a map), NOT the older `onlyBuiltDependencies` list. Only entries listed here
 # may run scripts. Adding one must be justified in the task report; runtime deps
