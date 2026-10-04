@@ -235,7 +235,30 @@ Runtime dependency added in this phase: `playwright-core` (in `packages/browser`
 - Browser: spawn Playwright Chromium with `--remote-debugging-port=0` on a temp user-data-dir (read `DevToolsActivePort`), attach, list pages, disconnect, then verify the browser is still alive.
 
 **Acceptance criteria**
-- [ ] S3 covered
+- [x] S3 covered
+
+**Implementation notes**
+- `ownership` is a **Session** field, not a `BrowserHandle` one (data-models §2, memory §66), so
+  `provider.ts` is unchanged from the spec's interface. What carries it is `kind`: `'launch'` is
+  `'launched'`, everything else attaches to a browser the user owns. This provider implements
+  the other half of the requirement — `close()` calls `browser.close()`, which for a
+  `connectOverCDP` client drops the connection and leaves the process running.
+- The loopback allowlist is literally the three spellings the spec names. `127.0.0.2` and the
+  expanded IPv6 form of `::1` are therefore refused: fail closed, and say so, rather than
+  growing a second list of "also loopback" addresses.
+- The S3 unit test aims at `ws://10.255.255.1` (a black hole). If the guard ever stopped
+  running before `connectOverCDP`, that test would hang into its timeout instead of passing.
+- New `page-registry.ts` holds the page bookkeeping (wrap once, keep order, notify, signal
+  disconnect once) that `LaunchProvider` had inline; both providers now share it. Copying it
+  into this provider would have duplicated ~60 lines, and three more providers are planned
+  (chrome-consent, extension, lightpanda). `launch-provider.ts` is refactored onto it — its
+  behaviour is unchanged and covered by the P2-04 browser tests.
+- The browser test spawns real Chromium with `--remote-debugging-port=0` over a temp
+  user-data-dir and reads the port out of `DevToolsActivePort`. It asks Chrome over HTTP
+  whether it is still alive rather than through Playwright, so the check does not depend on
+  Playwright's own context bookkeeping.
+- `viewport` is honoured only when the provider has to create a context; an attached browser's
+  existing window belongs to the user.
 
 ---
 

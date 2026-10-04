@@ -8,10 +8,11 @@
 import { existsSync } from 'node:fs';
 import type { BosPlatform, BrowserChannel, BrowserProfile } from '@browser-os/protocol';
 import { BosError } from '@browser-os/protocol';
-import type { BrowserContext, Page } from 'playwright-core';
+import type { BrowserContext } from 'playwright-core';
 import { chromium } from 'playwright-core';
 import { findExecutable } from '../executables.js';
-import { type PageHandle, PageHandleImpl } from '../page-handle.js';
+import type { PageHandle } from '../page-handle.js';
+import { PageRegistry } from '../page-registry.js';
 import { isProfileLocked } from '../profiles.js';
 import type { BrowserHandle, BrowserProvider, OpenOptions, ProviderCapabilities } from '../provider.js';
 
@@ -66,6 +67,11 @@ function defaultDeps(): LaunchProviderDeps {
   };
 }
 
+/**
+ * Sessions from this provider own their browser process, which is what the session manager
+ * records as `ownership: 'launched'` (data-models §2). That fact rides on `kind`; there is
+ * no separate ownership field on `BrowserHandle`.
+ */
 export class LaunchProvider implements BrowserProvider {
   readonly kind = 'launch' as const;
   readonly capabilities = CAPABILITIES;
@@ -114,76 +120,34 @@ class LaunchBrowserHandle implements BrowserHandle {
   readonly pid: number | null = null;
 
   private readonly context: BrowserContext;
-  private readonly pagesById = new Map<string, PageHandleImpl>();
-  /** Keyed by the Playwright page so a page is never registered twice. */
-  private readonly byPage = new WeakMap<Page, PageHandleImpl>();
-  private readonly pageCallbacks = new Set<(page: PageHandle) => void>();
-  private readonly disconnectedCallbacks = new Set<(reason: string) => void>();
-  private disconnected = false;
+  private readonly registry: PageRegistry;
 
   constructor(context: BrowserContext) {
     this.context = context;
-
-    for (const page of context.pages()) this.track(page);
-    // `newPage()` also emits this event, so `track` is idempotent per page.
-    context.on('page', (page) => void this.track(page));
-    context.on('close', () => this.emitDisconnected('context closed'));
-    context.browser()?.on('disconnected', () => this.emitDisconnected('browser disconnected'));
+    this.registry = new PageRegistry(context.pages());
+    // `newPage()` also emits this event, so tracking is idempotent per page.
+    context.on('page', (page) => void this.registry.track(page));
+    context.on('close', () => this.registry.emitDisconnected('context closed'));
+    context.browser()?.on('disconnected', () => this.registry.emitDisconnected('browser disconnected'));
   }
 
   pages(): PageHandle[] {
-    return [...this.pagesById.values()];
+    return this.registry.pages();
   }
 
   async newPage(): Promise<PageHandle> {
-    return this.track(await this.context.newPage());
+    return this.registry.newPageIn(this.context);
   }
 
   onPage(cb: (page: PageHandle) => void): () => void {
-    this.pageCallbacks.add(cb);
-    return () => {
-      this.pageCallbacks.delete(cb);
-    };
+    return this.registry.onPage(cb);
   }
 
   onDisconnected(cb: (reason: string) => void): () => void {
-    this.disconnectedCallbacks.add(cb);
-    return () => {
-      this.disconnectedCallbacks.delete(cb);
-    };
+    return this.registry.onDisconnected(cb);
   }
 
   async close(): Promise<void> {
     await this.context.close();
-  }
-
-  private track(page: Page): PageHandleImpl {
-    const existing = this.byPage.get(page);
-    if (existing !== undefined) return existing;
-
-    const handle = new PageHandleImpl(page);
-    this.byPage.set(page, handle);
-    this.pagesById.set(handle.id, handle);
-    handle.onClose(() => this.pagesById.delete(handle.id));
-
-    // `opener()` is async while `PageHandle.opener()` must be sync, so resolve it
-    // once, in the background. A page that never gets an opener just stays null.
-    void page
-      .opener()
-      .then((opener) => {
-        if (opener !== null) handle.setOpener(this.byPage.get(opener) ?? null);
-      })
-      .catch(() => {
-        // Best-effort enrichment only; a missing opener is not an error.
-      });
-
-    for (const cb of this.pageCallbacks) cb(handle);
-    return handle;
-  }
-
-  private emitDisconnected(reason: string): void {
-    if (this.disconnected) return;
-    this.disconnected = true;
-    for (const cb of this.disconnectedCallbacks) cb(reason);
   }
 }
