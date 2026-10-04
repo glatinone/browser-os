@@ -25,6 +25,24 @@ All tasks: `supervision: cheap-ok`. Runtime dependency allowed: `zod`.
 **Acceptance criteria**
 - [ ] Types and behaviour match spec exactly
 
+**Implementation notes**
+
+Implemented 2026-10-04. Two choices worth knowing:
+
+- **`ERROR_CODES` is the single source of the `ErrorCode` union**: the array is declared with `as const` and the type is
+  `(typeof ERROR_CODES)[number]`. Adding a code is one edit, the type cannot drift from the list, and tests can enumerate
+  every code — which is how the "retryable defaults for every code" requirement is actually verified. It lives in `errors.ts`,
+  not a new file, because the card fixes the file list.
+- **`ID_PREFIXES` is exported** for the same reason: the test table iterates the real prefix list instead of a copy.
+- `newId` uses the global `crypto.getRandomValues` (no import), 16 bytes for 16 chars. The `% 32` mapping is unbiased
+  because 256 is divisible by 32.
+
+The card's regex is given for `ses_` specifically; prefix lengths differ (`pg` = 2, `perm` = 4), so the test builds the
+pattern per prefix rather than assuming three letters.
+
+Verification: `pnpm build`, `pnpm lint` (boundaries OK), `pnpm test` → 16 files / 56 tests pass. `packages/protocol/src`
+reports 100% statements, branches and lines.
+
 ---
 
 ## P1-02 · Data model types
@@ -46,6 +64,26 @@ All tasks: `supervision: cheap-ok`. Runtime dependency allowed: `zod`.
 
 **Acceptance criteria**
 - [ ] `pnpm -r typecheck` passes; types identical to spec
+
+**Implementation notes**
+
+Implemented 2026-10-04. Notes for the next agent:
+
+- All eight files from the card exist and mirror `data-models.md` §3–§10 field for field, comments included. Every
+  cross-file reference uses `import type`, so the modules have no runtime dependency on each other and `index.ts` can
+  re-export all of them in dependency order without a cycle.
+- **`TARGETLESS` vs `hasTarget`.** The spec comment lists the targetless types as "navigate, wait, (press|scroll|extract
+  when target undefined)". A `Set` cannot express a conditional, so `TARGETLESS` holds only `navigate` and `wait` while
+  `hasTarget(action)` answers the real question per action (`'target' in action && action.target !== undefined`). Both are
+  required by the card and both are tested.
+- `DEFAULT_POLICY` and `mergePolicy` live in `policy.ts` together with `DeepPartial`. `mergePolicy` merges nested objects
+  key by key and **replaces** arrays (an override listing three upload directories means exactly three); `sites` is replaced
+  wholesale because order decides which policy matches first.
+- `ActionResult.risk` is `RiskLevel | null` and `error.details` is `Record<string, unknown>` as fixed by integration §3.
+
+Verification: `pnpm build`, `pnpm lint` (boundaries OK), `pnpm test` → 17 files / 67 tests pass. The `types.test.ts`
+`expectTypeOf` assertions are the compile-time proof that the discriminated unions kept their shapes: `pnpm build` fails
+if they drift.
 
 ---
 
