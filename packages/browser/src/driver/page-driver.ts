@@ -11,8 +11,11 @@ import { BosError, type BrowserAction, type ErrorCode } from '@browser-os/protoc
 import type { Page } from 'playwright-core';
 import { IsolatedWorlds } from '../cdp/isolated-worlds.js';
 import type { CdpTransport } from '../cdp/transport.js';
-import { cdpClick, cdpHover, type PointerResult } from './cdp-pointer.js';
+import { cdpFill, cdpScroll, cdpSelect } from './cdp-form.js';
+import { cdpPress } from './cdp-keyboard.js';
+import { cdpClick, cdpHover } from './cdp-pointer.js';
 import { EXTRACTION, type ExtractFormat } from './extract.js';
+import type { CdpContext, DriverOutcome } from './op.js';
 import type { DriverResult, PageDriver, ResolvedTarget } from './types.js';
 
 export interface DefaultPageDriverDeps {
@@ -93,28 +96,19 @@ export class DefaultPageDriver implements PageDriver {
 
   // — the rest of the interface arrives with the tasks below; each one says which —
 
-  async cdpPerform(action: BrowserAction, target: ResolvedTarget | null, _value?: string): Promise<DriverResult> {
-    if (action.type !== 'click' && action.type !== 'hover') {
-      throw this.#notYet(`cdpPerform(${action.type})`, 'P3-03');
-    }
-    if (target === null) {
-      throw new BosError('INVALID_REQUEST', `A ${action.type} needs a target`, {});
-    }
-
+  async cdpPerform(action: BrowserAction, target: ResolvedTarget | null, value?: string): Promise<DriverResult> {
     const { transport } = await this.#cdp();
     const urlBefore = this.#page.url();
     const pagesBefore = this.#knownPageIds?.() ?? [];
     const navigation = this.#watchNavigation(transport);
+    const ctx: CdpContext = {
+      transport,
+      call: (source, args, at) => this.#call(source, args, at),
+    };
 
-    let outcome: PointerResult;
+    let outcome: DriverOutcome;
     try {
-      outcome =
-        action.type === 'click'
-          ? await cdpClick(transport, target, {
-              ...(action.button === undefined ? {} : { button: action.button }),
-              ...(action.clickCount === undefined ? {} : { clickCount: action.clickCount }),
-            })
-          : await cdpHover(transport, target);
+      outcome = await this.#perform(ctx, action, target, value);
       // A click that navigates, or opens a page, does it just after the input goes out.
       await this.#until(() => navigation.navigated(), ACTION_GRACE_MS);
       await this.#until(() => this.#newPageId(pagesBefore) !== undefined, ACTION_GRACE_MS);
@@ -132,6 +126,40 @@ export class DefaultPageDriver implements PageDriver {
       navigated: navigation.navigated(),
       ...(newPageId === undefined ? {} : { newPageId }),
     };
+  }
+
+  /**
+   * The CDP executor for every action it owns (action-router §6). Navigation, extraction, the
+   * waits and uploads are reached through the driver's own methods by the router, not here.
+   */
+  async #perform(
+    ctx: CdpContext,
+    action: BrowserAction,
+    target: ResolvedTarget | null,
+    value: string | undefined,
+  ): Promise<DriverOutcome> {
+    switch (action.type) {
+      case 'click':
+        return await cdpClick(ctx.transport, needTarget(action.type, target), {
+          ...(action.button === undefined ? {} : { button: action.button }),
+          ...(action.clickCount === undefined ? {} : { clickCount: action.clickCount }),
+        });
+      case 'hover':
+        return await cdpHover(ctx.transport, needTarget(action.type, target));
+      case 'fill':
+        return await cdpFill(ctx, needTarget(action.type, target), needValue(action.type, value), {
+          submit: action.submit === true,
+        });
+      case 'press':
+        // `press` may carry no target: the key goes to whatever already has focus.
+        return await cdpPress(ctx.transport, action.key, target);
+      case 'select':
+        return await cdpSelect(ctx, needTarget(action.type, target), needValue(action.type, value));
+      case 'scroll':
+        return await cdpScroll(ctx.transport, target, action.direction, action.amountPx);
+      default:
+        throw this.#notYet(`cdpPerform(${action.type})`, 'P3-05 and P3-06');
+    }
   }
 
   async playwrightPerform(
@@ -277,6 +305,20 @@ export class DefaultPageDriver implements PageDriver {
       details: { method, task },
     });
   }
+}
+
+function needTarget(actionType: string, target: ResolvedTarget | null): ResolvedTarget {
+  if (target === null) {
+    throw new BosError('INVALID_REQUEST', `A ${actionType} needs a target`, {});
+  }
+  return target;
+}
+
+function needValue(actionType: string, value: string | undefined): string {
+  if (value === undefined) {
+    throw new BosError('INVALID_REQUEST', `A ${actionType} needs a value`, {});
+  }
+  return value;
 }
 
 /** A relative or malformed url is refused before anything is sent. */

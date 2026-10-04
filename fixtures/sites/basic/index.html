@@ -68,5 +68,19 @@
     document.getElementById('far-button').addEventListener('click', () => record('far-click'));
   </script>
 
+<p><label for="controlled">Controlled</label>
+   <input id="controlled" name="controlled" type="text"></p>
+<p><label for="locked">Locked</label>
+   <input id="locked" name="locked" type="text" readonly></p>
+<script>
+  // A framework-style controlled field: the value lives in JS, it is accepted from an `input`
+  // event, and anything that changed the field without saying so is written back over.
+  const controlled = document.getElementById('controlled');
+  let controlledState = '';
+  controlled.addEventListener('input', () => { controlledState = controlled.value; });
+  setInterval(() => {
+    if (controlled.value !== controlledState) controlled.value = controlledState;
+  }, 25);
+</script>
 </body>
 </html>

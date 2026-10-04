@@ -157,6 +157,31 @@ Read first: `docs/specs/browser-runtime.md` §5–6, `docs/specs/action-router.m
 
 **Acceptance criteria**
 - [ ] All MVP action types except navigate/wait are executable via CDP
+  (still open: `upload` belongs to P3-06 and `waitFor` to P3-05. Everything else — click, hover,
+  fill, press, select, scroll — is reachable through `cdpPerform` now.)
+
+**Implementation notes**
+- **The native-setter fallback has to pick its prototype by element type.** Calling
+  `HTMLInputElement.prototype.value`'s setter on a contenteditable throws *Illegal invocation*;
+  a plain element has no value at all and only takes `textContent`. The first version applied the
+  input descriptor to everything that was not a textarea, so filling the contenteditable failed
+  outright. The contenteditable test is what caught it.
+- `Input.insertText` fires an `input` event, so a conventional controlled field accepts it and
+  the fallback never runs. The fixture therefore has two fields: `#controlled`, which re-renders
+  itself from its own state every 25 ms, and `#locked`, a `readonly` field that refuses inserted
+  text — that is the one that exercises the setter path, and the test asserts both.
+- `press` uses `keyDown` for a printable key (that is the type which carries `text` and inserts
+  it) and `rawKeyDown` for the rest; a `rawKeyDown` with text inserts nothing. Modifiers are the
+  CDP bitmask (Alt 1, Control 2, Meta 4, Shift 8) and `Control+A` is asserted through the field's
+  own selection state rather than through a side effect.
+- `pointAtTarget` was extracted from the click path so `scroll` can reuse the geometry without the
+  hit-test: a wheel event may legitimately land on a covered element, and refusing it would be
+  wrong.
+- `DriverOutcome` and `CdpContext` now live in `driver/op.ts` and `PointerResult` is gone: one
+  outcome shape for every driver operation, so `#perform` can return them from one place.
+- `cdpPerform` dispatches through a `#perform` switch over the action union. Navigation,
+  extraction, the waits and uploads are the router's own driver calls, not executor actions.
+- The `basic` fixture gained `#controlled` and `#locked` (see above).
 
 ---
 

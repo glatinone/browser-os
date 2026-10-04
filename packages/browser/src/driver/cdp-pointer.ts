@@ -6,15 +6,9 @@
 //   unknown — input may have been dispatched and the call errored afterwards
 // `committed` belongs to the caller, which is the only one that knows the whole call completed.
 
-import type { ErrorCode } from '@browser-os/protocol';
 import type { CdpTransport } from '../cdp/transport.js';
+import { type DriverOutcome, refuse, unsure } from './op.js';
 import type { ResolvedTarget } from './types.js';
-
-export interface PointerResult {
-  ok: boolean;
-  effect: 'none' | 'committed' | 'unknown';
-  error?: { code: ErrorCode; message: string };
-}
 
 export interface ClickOptions {
   button?: 'left' | 'right' | 'middle';
@@ -28,9 +22,15 @@ interface Quad {
   height: number;
 }
 
-interface Point {
+export interface Point {
   x: number;
   y: number;
+}
+
+export interface TargetPoint {
+  point: Point;
+  /** The document scroll the point was measured against. */
+  scroll: Point;
 }
 
 interface DescribedNode {
@@ -51,7 +51,7 @@ export async function cdpClick(
   transport: CdpTransport,
   target: ResolvedTarget,
   opts: ClickOptions = {},
-): Promise<PointerResult> {
+): Promise<DriverOutcome> {
   const pointed = await clickPoint(transport, target);
   if (!('x' in pointed)) return pointed;
 
@@ -89,7 +89,7 @@ export async function cdpClick(
 }
 
 /** Moves the pointer onto the target and nothing else. */
-export async function cdpHover(transport: CdpTransport, target: ResolvedTarget): Promise<PointerResult> {
+export async function cdpHover(transport: CdpTransport, target: ResolvedTarget): Promise<DriverOutcome> {
   const pointed = await clickPoint(transport, target);
   if (!('x' in pointed)) return pointed;
 
@@ -102,8 +102,14 @@ export async function cdpHover(transport: CdpTransport, target: ResolvedTarget):
   return { ok: true, effect: 'committed' };
 }
 
-/** The point a click would land on, or the reason there is none. */
-async function clickPoint(transport: CdpTransport, target: ResolvedTarget): Promise<Point | PointerResult> {
+/**
+ * Where the target is: scrolled into view, then the centre of its largest quad that is inside the
+ * viewport. No quad at all, or none on screen, is a refusal rather than a bad guess.
+ */
+export async function pointAtTarget(
+  transport: CdpTransport,
+  target: ResolvedTarget,
+): Promise<TargetPoint | DriverOutcome> {
   await transport.send('DOM.scrollIntoViewIfNeeded', { backendNodeId: target.backendNodeId });
 
   const answered = (await transport.send('DOM.getContentQuads', {
@@ -111,18 +117,15 @@ async function clickPoint(transport: CdpTransport, target: ResolvedTarget): Prom
   })) as { quads?: number[][] };
   const quads = (answered.quads ?? []).map(toQuad).filter((quad) => quad.width > 0 && quad.height > 0);
   if (quads.length === 0) {
-    return refuse('TARGET_NOT_INTERACTABLE', 'the target has no box to click');
+    return refuse('TARGET_NOT_INTERACTABLE', 'the target has no box to point at');
   }
 
-  // `getContentQuads` answers in document coordinates, so the part of the document that is on
-  // screen right now is the layout viewport *offset by its own scroll*. `getNodeForLocation` and
-  // the mouse events, on the other hand, take viewport coordinates — the offset comes off again
-  // before anything is dispatched (§5).
+  // The quads and the mouse events are both in viewport coordinates, so the on-screen part of the
+  // document is simply the viewport rectangle.
   const metrics = (await transport.send('Page.getLayoutMetrics', {})) as {
     layoutViewport?: { pageX?: number; pageY?: number; clientWidth?: number; clientHeight?: number };
   };
   const layout = metrics.layoutViewport;
-  const scroll = { x: layout?.pageX ?? 0, y: layout?.pageY ?? 0 };
   const onScreen: Quad = {
     x: 0,
     y: 0,
@@ -134,24 +137,34 @@ async function clickPoint(transport: CdpTransport, target: ResolvedTarget): Prom
     return refuse('TARGET_NOT_INTERACTABLE', 'the target is outside the viewport');
   }
 
-  const point = centre(largest(visible));
-  // The two coordinate spaces differ, which is easy to miss and hard to debug: quads and the
-  // mouse events are in viewport coordinates, while the hit-test wants document coordinates and
-  // only answers for what is currently on screen. The scroll offset goes on for the hit-test.
+  return {
+    point: centre(largest(visible)),
+    scroll: { x: layout?.pageX ?? 0, y: layout?.pageY ?? 0 },
+  };
+}
+
+/** The point a click would land on: `pointAtTarget`, plus proof that the point is really there. */
+async function clickPoint(transport: CdpTransport, target: ResolvedTarget): Promise<Point | DriverOutcome> {
+  const found = await pointAtTarget(transport, target);
+  if (!('point' in found)) return found;
+
+  // The two coordinate spaces differ, which is easy to miss and hard to debug: the quads and the
+  // mouse events are in viewport coordinates, while the hit-test takes document coordinates and
+  // only answers for what is currently on screen. The scroll offset goes on for this call alone.
   const hit = (await transport.send('DOM.getNodeForLocation', {
-    x: Math.round(point.x + scroll.x),
-    y: Math.round(point.y + scroll.y),
+    x: Math.round(found.point.x + found.scroll.x),
+    y: Math.round(found.point.y + found.scroll.y),
     includeUserAgentShadowDOM: true,
   })) as { nodeId?: number };
 
   if (!(await reachesTarget(transport, target, hit.nodeId))) {
     return refuse(
       'TARGET_OBSCURED',
-      `another element covers the target at ${Math.round(point.x)},${Math.round(point.y)}`,
+      `another element covers the target at ${Math.round(found.point.x)},${Math.round(found.point.y)}`,
     );
   }
 
-  return point;
+  return found.point;
 }
 
 /**
@@ -279,21 +292,4 @@ function largest(quads: Quad[]): Quad {
 
 function centre(quad: Quad): Point {
   return { x: quad.x + quad.width / 2, y: quad.y + quad.height / 2 };
-}
-
-function refuse(code: ErrorCode, message: string): PointerResult {
-  return { ok: false, effect: 'none', error: { code, message } };
-}
-
-/** Input was already going out, so whether it landed is anyone's guess (§4.1). */
-function unsure(error: unknown): PointerResult {
-  return {
-    ok: false,
-    effect: 'unknown',
-    error: { code: 'ACTION_FAILED', message: describe(error) },
-  };
-}
-
-function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
