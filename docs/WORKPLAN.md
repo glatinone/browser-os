@@ -11,9 +11,14 @@ Status task tetap dilacak di `docs/tasks/README.md`.
 
 ## 1. Kondisi repo saat ini
 
-- Isi repo 100% dokumen: 8.011 baris di `docs/` (PRD, ARCHITECTURE, 7 spec, 19 ADR, 14 kartu task, 12 cross-cutting). **Nol baris kode.**
-- Belum ada `.git`, `.gitignore`, `.github`, `package.json`, `pnpm-workspace.yaml`.
-- Task berikutnya menurut rencana: `P0-01` (lihat `docs/tasks/README.md`).
+- **Phase 0 (M0 Scaffold) selesai.** `P0-01`, `P0-02`, `P0-04` = `done`; `P0-03` (CI) = `review` (butuh remote GitHub).
+- Monorepo pnpm berisi sembilan package kosong yang build/typecheck/lint/test hijau, penjaga batas dependency,
+  dan fixture server + 13 halaman. **Belum ada logika produk.**
+- Git aktif di branch `main`, lima commit, worktree bersih. Belum ada remote.
+- **GATE G0 lulus** (2026-10-04) dari clone bersih: `pnpm install --frozen-lockfile`, `pnpm build`,
+  `pnpm -r typecheck`, `pnpm lint`, `pnpm test` (14 file / 31 tes), `pnpm test:coverage`, `pnpm test:browser`,
+  `pnpm test:e2e`, `bos --version` — semuanya exit 0.
+- Task berikutnya menurut rencana: `P1-01` (lihat `docs/tasks/README.md`).
 
 ## 2. Keputusan lingkungan (diambil pemilik, 2026-10-04)
 
@@ -234,5 +239,14 @@ stack Keycloak self-hosted); packaging + MVP acceptance → tag **v0.1.0** (COMP
 
 ## 10. Langkah berikutnya
 
-Kalau pemilik bilang go: **FASE A (`P0-01`, `P0-02`, `P0-04`; `P0-03` ditandai `review`)** dalam satu tarikan,
-lalu berhenti di **GATE G0** untuk laporan. Tidak menyentuh task lain sampai `P0-01` hijau.
+**FASE A selesai, GATE G0 lulus.** Lanjutannya berurutan; gate G2/G3 tetap milik pemilik, FASE B/C tidak. Gate G0 sudah lewat.
+
+1. **FASE B — Phase 1 `P1-01`…`P1-04`** (`packages/protocol`): ids + `BosError`, tipe `specs/data-models.md`,
+   zod schema + tabel method RPC, lalu `mask.ts`/EventBus/paths/target syntax. Semua package lain menunggu ini.
+   Perhatikan `SENSITIVE_NAME_RE` — satu-satunya sumber regex sensitivitas (integration §2).
+2. Jalur paralel yang aman karena package berbeda: **`P5-01`…`P5-04`** (`ai`, FakeModel dulu, tanpa API key) dan
+   **`P6-01`…`P6-04`** (`memory`, better-sqlite3 — ingat `allowBuilds` di `pnpm-workspace.yaml`, lihat CONFLICTS.md).
+3. **FASE C** (`P2`, `P3`) baru setelah FASE B, karena `PageDriver` memakai tipe `protocol`.
+
+Yang masih menunggu pemilik dan tidak menghalangi FASE B: remote GitHub (untuk menaikkan `P0-03` dari `review` ke `done`),
+izin employer sebelum push publik, dan keputusan di gate G2/G3.
