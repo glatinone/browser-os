@@ -1,6 +1,15 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Basic form page</title></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Basic form page</title>
+<style>
+  .menu { position: relative; display: inline-block; }
+  .menu-items { display: none; position: absolute; margin: 4px 0 0; padding: 4px 8px; list-style: none; border: 1px solid #888; background: #fff; }
+  .menu:hover .menu-items, .menu:focus-within .menu-items { display: block; }
+  .switch { position: relative; display: inline-block; }
+  .switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; }
+  .switch label { position: relative; display: inline-block; padding: 4px 8px; border: 1px solid #888; }
+</style>
+</head>
 <body>
 <header>
   <nav aria-label="Main">
@@ -9,6 +18,13 @@
     <a href="/basic/pricing">Pricing</a>
     <a href="/basic/contact">Contact</a>
   </nav>
+  <div class="menu">
+    <button type="button" id="menu-trigger" aria-haspopup="true">More</button>
+    <ul class="menu-items">
+      <li><a href="/basic/account">Account</a></li>
+      <li><a href="/basic/billing">Billing</a></li>
+    </ul>
+  </div>
   <button type="button" aria-label="Settings">&#9881;</button>
 </header>
 <main>
@@ -34,8 +50,23 @@
     <p><label for="notes">Notes</label><textarea id="notes" name="notes" rows="3"></textarea></p>
     <p><button type="submit">Create account</button>
        <button type="button" disabled>Delete everything</button></p>
+    <p class="switch">
+      <input id="switch" name="switch" type="checkbox" value="yes">
+      <label for="switch">Enable the beta features</label>
+    </p>
   </form>
+  <p><button id="probe" type="button">Probe</button> <span id="probe-log">-</span></p>
 </main>
+<div style="height:1500px"></div>
+<p><button id="far-button" type="button">Far away</button></p>
+<script>
+    const probeLog = document.getElementById('probe-log');
+    const record = (text) => { probeLog.textContent = text; };
+    document.getElementById('probe').addEventListener('click', () => record('click'));
+    document.getElementById('probe').addEventListener('dblclick', () => record('dblclick'));
+    document.getElementById('probe').addEventListener('contextmenu', () => record('contextmenu'));
+    document.getElementById('far-button').addEventListener('click', () => record('far-click'));
+  </script>
 
 </body>
 </html>
