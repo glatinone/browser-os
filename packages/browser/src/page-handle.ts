@@ -4,10 +4,11 @@
 // re-exported from `src/index.ts` (task P2-04 acceptance; CODING_AGENT rule 6).
 // Everything a caller sees is a protocol type or one of our own interfaces.
 
-import { BosError, newId } from '@browser-os/protocol';
+import { newId } from '@browser-os/protocol';
 import type { Page } from 'playwright-core';
 import { createPageCdp } from './cdp/playwright.js';
 import type { CdpTransport } from './cdp/transport.js';
+import { DefaultPageDriver } from './driver/page-driver.js';
 import type { PageDriver } from './driver/types.js';
 
 export interface PageHandle {
@@ -29,6 +30,7 @@ export class PageHandleImpl implements PageHandle {
   private readonly closeCallbacks = new Set<() => void>();
   private openerHandle: PageHandle | null = null;
   private cdpTransport: Promise<CdpTransport> | null = null;
+  private driverInstance: PageDriver | null = null;
 
   constructor(page: Page) {
     this.id = newId('pg');
@@ -74,7 +76,12 @@ export class PageHandleImpl implements PageHandle {
   }
 
   driver(): PageDriver {
-    throw new BosError('INTERNAL', 'PageHandle.driver() is implemented in P3-01', {});
+    // The driver shares this page's CDP session rather than opening a second one (§4).
+    this.driverInstance ??= new DefaultPageDriver({
+      page: this.page,
+      transport: () => this.cdp(),
+    });
+    return this.driverInstance;
   }
 
   async bringToFront(): Promise<void> {

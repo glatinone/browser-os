@@ -224,6 +224,9 @@ describe.skipIf(isPosix)('isProfileLocked — Windows lockfile', () => {
     expect(await isProfileLocked(dir)).toBe(false);
   });
 
+  // The poll budget below is 20 s, which the default 5 s test timeout cannot cover: PowerShell
+  // takes seconds to start on a cold or busy machine, and the test needs room for the budget it
+  // asks for rather than failing before that budget runs out.
   it('is true while another process holds the file exclusively', async () => {
     const dir = await ensureProfileDir(bosHome, 'work');
     const lockfile = path.join(dir, 'lockfile');
@@ -233,8 +236,11 @@ describe.skipIf(isPosix)('isProfileLocked — Windows lockfile', () => {
     // exclusive and the probe succeeds. Chrome asks for FileShare.None; PowerShell
     // is the only thing on a stock runner that can reproduce that, and it does make
     // the probe fail with EBUSY (measured).
+    //
+    // Spawned by its full path: what is being tested is an exclusive file lock, not whether the
+    // shell can resolve `powershell` through PATH, and a worker without it fails with ENOENT.
     const holder = spawn(
-      'powershell',
+      path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
       [
         '-NoProfile',
         '-Command',
@@ -242,12 +248,22 @@ describe.skipIf(isPosix)('isProfileLocked — Windows lockfile', () => {
       ],
       { stdio: 'ignore' },
     );
+    // A failed spawn has to be reported here: otherwise it is an uncaught exception and the test
+    // sits out its whole poll budget before the timeout.
+    let spawnFailure: Error | null = null;
+    holder.on('error', (error: Error) => {
+      spawnFailure = error;
+    });
 
     try {
-      expect(await until(async () => isProfileLocked(dir), 20000)).toBe(true);
+      const locked = await until(async () => spawnFailure !== null || (await isProfileLocked(dir)), 20000);
+      expect(spawnFailure).toBeNull();
+      expect(locked).toBe(true);
     } finally {
-      holder.kill('SIGKILL');
-      await new Promise((resolve) => holder.once('exit', resolve));
+      if (holder.pid !== undefined) {
+        holder.kill('SIGKILL');
+        await new Promise((resolve) => holder.once('exit', resolve));
+      }
     }
-  });
+  }, 30_000);
 });
