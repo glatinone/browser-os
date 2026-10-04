@@ -16,7 +16,7 @@
     "test:e2e": "vitest run --project e2e --passWithNoTests",
     "test:all": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --project unit --coverage",
-    "lint": "biome check .",
+    "lint": "biome check . && node scripts/check-boundaries.mjs",
     "format": "biome format --write .",
     "bench": "echo \"see benchmarks/\""
   },

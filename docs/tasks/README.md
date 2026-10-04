@@ -18,7 +18,7 @@ Task cards: `phase-XX-*.md` in this folder. Conflicts and questions: `CONFLICTS.
 |---|---|---|---|---|
 | **Phase 0** | **Scaffold** | | | |
 | P0-01 | Monorepo scaffold | — | cheap | done |
-| P0-02 | Package boundary checker | P0-01 | cheap | todo |
+| P0-02 | Package boundary checker | P0-01 | cheap | done |
 | P0-03 | CI workflow | P0-02 | cheap | todo |
 | P0-04 | Fixture server and fixture sites | P0-01 | cheap | todo |
 | **Phase 1** | **Protocol** | | | |

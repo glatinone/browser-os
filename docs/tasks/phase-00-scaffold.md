@@ -112,6 +112,21 @@ CODING_AGENT §7 graph. Linux is covered by CI (P0-03).
 
 **Implementation notes**
 
+Implemented 2026-10-04. `scripts/check-boundaries.mjs` exports `checkBoundaries(rootDir)` (plus `packageNameOf`) for
+tests and runs as a CLI when invoked directly; the root `lint` script is now `biome check . && node scripts/check-boundaries.mjs`.
+`scripts/test/**/*.test.ts` was already inside the Vitest `unit` project include, so no config change was needed.
+
+Covered beyond the card's five cases, because each one is a real failure mode:
+external dependency not approved for the package (both the import **and** the `package.json` declaration are reported),
+internal import outside the graph, deep import (`@browser-os/x/src/...`), relative import escaping the package root,
+`node:*` allowed everywhere, the cli's declaration-only `@browser-os/daemon` (integration §14 — allowed to declare,
+forbidden to import), and a test that runs the checker against this repository.
+
+Verification: `pnpm lint` → `package boundaries OK`, exit 0. `pnpm test` → 10 files / 17 tests pass.
+End-to-end proof of the CLI path: appending `import { chromium } from 'playwright-core'` to `packages/dom/src/index.ts`
+produced exactly the card's message format (`packages/dom/src/index.ts: imports 'playwright-core' (not allowed in dom)`)
+and exit 1; reverting returned exit 0.
+
 ---
 
 ## P0-03 · CI workflow
