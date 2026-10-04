@@ -13,4 +13,5 @@ export * from './manual-launch.js';
 export type { PageHandle } from './page-handle.js';
 export * from './profiles.js';
 export * from './provider.js';
+export * from './providers/cdp-endpoint-provider.js';
 export * from './providers/launch-provider.js';

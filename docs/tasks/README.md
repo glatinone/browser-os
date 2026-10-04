@@ -31,7 +31,7 @@ Task cards: `phase-XX-*.md` in this folder. Conflicts and questions: `CONFLICTS.
 | P2-02 | Profile directories (filesystem) | P1-04 | cheap | done |
 | P2-04 | LaunchProvider and PageHandle | P2-01, P2-02 | cheap | done |
 | P2-03 | CDP transport, counting wrapper, isolated worlds | P2-04 | review | done |
-| P2-05 | CdpEndpointProvider | P2-04 | cheap | todo |
+| P2-05 | CdpEndpointProvider | P2-04 | cheap | done |
 | P2-06 | Manual setup mode launcher | P2-01, P2-02 | cheap | done |
 | P2-07 | Session manager | P2-04, P2-05 | review | todo |
 | **Phase 3** | **Action execution** | | | |
