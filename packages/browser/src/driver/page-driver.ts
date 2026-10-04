@@ -11,6 +11,7 @@ import { BosError, type BrowserAction, type ErrorCode } from '@browser-os/protoc
 import type { Page } from 'playwright-core';
 import { IsolatedWorlds } from '../cdp/isolated-worlds.js';
 import type { CdpTransport } from '../cdp/transport.js';
+import { cdpClick, cdpHover, type PointerResult } from './cdp-pointer.js';
 import { EXTRACTION, type ExtractFormat } from './extract.js';
 import type { DriverResult, PageDriver, ResolvedTarget } from './types.js';
 
@@ -18,7 +19,16 @@ export interface DefaultPageDriverDeps {
   page: Page;
   /** The page's own CDP session, shared rather than opened a second time (§4). */
   transport: () => Promise<CdpTransport>;
+  /**
+   * The pages the session currently has, so a click that opens one can name it (§P3-02).
+   * Injected because the session, not the page, owns that list.
+   */
+  knownPageIds?: () => readonly string[];
 }
+
+/** How long an action gets to show a navigation or a page it opened (§P3-02). */
+const ACTION_GRACE_MS = 500;
+const ACTION_GRACE_POLL_MS = 50;
 
 interface ExceptionDetails {
   text?: string;
@@ -33,12 +43,14 @@ interface CdpSession {
 export class DefaultPageDriver implements PageDriver {
   readonly #page: Page;
   readonly #openTransport: () => Promise<CdpTransport>;
+  readonly #knownPageIds: (() => readonly string[]) | undefined;
   #session: Promise<CdpSession> | null = null;
   #cachedFrameId: string | null = null;
 
   constructor(deps: DefaultPageDriverDeps) {
     this.#page = deps.page;
     this.#openTransport = deps.transport;
+    this.#knownPageIds = deps.knownPageIds;
   }
 
   async navigate(url: string, timeoutMs: number): Promise<DriverResult> {
@@ -81,8 +93,45 @@ export class DefaultPageDriver implements PageDriver {
 
   // — the rest of the interface arrives with the tasks below; each one says which —
 
-  async cdpPerform(_action: BrowserAction, _target: ResolvedTarget | null, _value?: string): Promise<DriverResult> {
-    throw this.#notYet('cdpPerform', 'P3-02');
+  async cdpPerform(action: BrowserAction, target: ResolvedTarget | null, _value?: string): Promise<DriverResult> {
+    if (action.type !== 'click' && action.type !== 'hover') {
+      throw this.#notYet(`cdpPerform(${action.type})`, 'P3-03');
+    }
+    if (target === null) {
+      throw new BosError('INVALID_REQUEST', `A ${action.type} needs a target`, {});
+    }
+
+    const { transport } = await this.#cdp();
+    const urlBefore = this.#page.url();
+    const pagesBefore = this.#knownPageIds?.() ?? [];
+    const navigation = this.#watchNavigation(transport);
+
+    let outcome: PointerResult;
+    try {
+      outcome =
+        action.type === 'click'
+          ? await cdpClick(transport, target, {
+              ...(action.button === undefined ? {} : { button: action.button }),
+              ...(action.clickCount === undefined ? {} : { clickCount: action.clickCount }),
+            })
+          : await cdpHover(transport, target);
+      // A click that navigates, or opens a page, does it just after the input goes out.
+      await this.#until(() => navigation.navigated(), ACTION_GRACE_MS);
+      await this.#until(() => this.#newPageId(pagesBefore) !== undefined, ACTION_GRACE_MS);
+    } finally {
+      navigation.stop();
+    }
+
+    const newPageId = this.#newPageId(pagesBefore);
+    return {
+      ok: outcome.ok,
+      effect: outcome.effect,
+      ...(outcome.error === undefined ? {} : { error: outcome.error }),
+      urlBefore,
+      urlAfter: this.#page.url(),
+      navigated: navigation.navigated(),
+      ...(newPageId === undefined ? {} : { newPageId }),
+    };
   }
 
   async playwrightPerform(
@@ -183,6 +232,33 @@ export class DefaultPageDriver implements PageDriver {
       throw new BosError('INTERNAL', `the bos world threw: ${message}`, { details: { frameId } });
     }
     return response.result?.value as T;
+  }
+
+  /** A main-frame navigation seen while an action is running. */
+  #watchNavigation(transport: CdpTransport): { navigated: () => boolean; stop: () => void } {
+    let navigated = false;
+    const off = transport.on('Page.frameNavigated', (payload) => {
+      const frame = (payload as { frame?: { parentId?: string } }).frame;
+      // The main frame only: a subframe navigating is not the page navigating.
+      if (frame !== undefined && frame.parentId === undefined) navigated = true;
+    });
+    return {
+      navigated: () => navigated,
+      stop: off,
+    };
+  }
+
+  /** The page an action opened, when the session has told us which pages it has. */
+  #newPageId(before: readonly string[]): string | undefined {
+    return this.#knownPageIds?.().find((id) => !before.includes(id));
+  }
+
+  /** Polls until `reached`; only the short post-action grace windows use it. */
+  async #until(reached: () => boolean, timeoutMs: number): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (!reached() && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, ACTION_GRACE_POLL_MS));
+    }
   }
 
   #failed(code: ErrorCode, message: string, urlBefore: string, effect: DriverResult['effect']): DriverResult {

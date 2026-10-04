@@ -31,6 +31,7 @@ export class PageHandleImpl implements PageHandle {
   private openerHandle: PageHandle | null = null;
   private cdpTransport: Promise<CdpTransport> | null = null;
   private driverInstance: PageDriver | null = null;
+  private pageIdsSource: (() => readonly string[]) | null = null;
 
   constructor(page: Page) {
     this.id = newId('pg');
@@ -41,6 +42,11 @@ export class PageHandleImpl implements PageHandle {
       for (const cb of this.closeCallbacks) cb();
       this.closeCallbacks.clear();
     });
+  }
+
+  /** Set by the owning registry: the pages of this session, for `newPageId` (P3-02). */
+  setPageIdsSource(source: () => readonly string[]): void {
+    this.pageIdsSource = source;
   }
 
   /** Set by the owning BrowserHandle once Playwright reports the opener. */
@@ -80,6 +86,7 @@ export class PageHandleImpl implements PageHandle {
     this.driverInstance ??= new DefaultPageDriver({
       page: this.page,
       transport: () => this.cdp(),
+      knownPageIds: () => this.pageIdsSource?.() ?? [this.id],
     });
     return this.driverInstance;
   }

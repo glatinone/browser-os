@@ -144,7 +144,9 @@ describe('DefaultPageDriver reading and extraction', () => {
         const transport = await handle.cdp();
 
         const links = (await driver.extract(null, 'links')) as { text: string; href: string }[];
-        expect(links.map((link) => link.text)).toEqual(['Home', 'Docs', 'Pricing', 'Contact']);
+        // The hover menu's items are anchors as well, and they are included: the format reports
+        // the links a page has, not only the ones it happens to be showing (§5).
+        expect(links.map((link) => link.text)).toEqual(['Home', 'Docs', 'Pricing', 'Contact', 'Account', 'Billing']);
         expect(links[0]?.href).toBe(`${server.baseUrl}/basic/`);
         expect(links[1]?.href).toBe(`${server.baseUrl}/basic/docs`);
 

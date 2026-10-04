@@ -91,8 +91,48 @@ Read first: `docs/specs/browser-runtime.md` §5–6, `docs/specs/action-router.m
 - a target scrolled out of view is scrolled and clicked
 
 **Acceptance criteria**
-- [ ] `effect` correct in every test
-- [ ] L4 measured once and printed in the test output (informational)
+- [x] `effect` correct in every test
+- [x] L4 measured once and printed in the test output (informational)
+
+**Implementation notes**
+- **The two coordinate spaces are not the same, and that is the whole trap.** `DOM.getContentQuads`
+  answers in viewport coordinates, `Input.dispatchMouseEvent` takes viewport coordinates, but
+  `DOM.getNodeForLocation` takes *document* coordinates and only answers for what is on screen.
+  Measured on a scrolled target: the quad came back as viewport `y ≈ 232` while
+  `layoutViewport.pageY` was `333` — the hit-test at 232 found no node at all, and at 232 + 333 it
+  found the target. Unscrolled pages hide this, which is why the header cases passed while every
+  below-the-fold one failed.
+- **A double click is two press/release pairs with a rising `clickCount`.** One pair carrying
+  `clickCount: 2` does not make Chrome emit `dblclick`; the fixture recorded `click` until the
+  sequence was right. The card's single-pair wording would not have passed its own test.
+- **`effect` on a failed dispatch is `unknown`.** §4.1 puts it there: once the first
+  `Input.dispatchMouseEvent` has gone out, the call may have been delivered even if it errored.
+  The card ties this to `mousePressed`; this is the same rule applied from the first dispatch.
+- The hit-test walks **frontend** node ids: it resolves the target with
+  `DOM.pushNodesByBackendIdsToFrontend` first, because `describeNode`'s `parentId` is a `NodeId`
+  and comparing that against a `BackendNodeId` never matches — silently, since both are numbers.
+- Label acceptance covers both `<label for=...>` and a label that wraps the control (the walk
+  checks the label's `for`, then whether it contains the target).
+- `newPageId` is wired through a `knownPageIds` callback on the driver's deps. `PageRegistry` owns
+  the page list, so it hands that callback to each handle — the page itself has no idea what its
+  siblings are.
+- **`>>>` is not a selector `DOM.querySelector` accepts** in this Chrome (`DOM error while
+  querying`), so the shadow test resolves its target by walking a `DOM.describeNode` subtree with
+  `pierce: true`. Worth knowing for P4-01: `ElementLocator.cssPath` documents shadow boundaries
+  joined with `" >>> "`, and that string is not directly usable as a CDP selector.
+- L4 measured on this machine: **6.7 – 19.9 ms** across runs, printed by the test. Informational
+  only (PERFORMANCE.md's p50 budget is ≤ 15 ms and thresholds do not fail until P10), but it sits
+  around the budget on a loaded laptop, which is worth watching.
+- The `basic` fixture gained what this task has to click: a menu that only appears on hover, a
+  checkbox whose transparent input sits under its label, a probe button that records
+  `click`/`dblclick`/`contextmenu`, and a button behind a 1500 px spacer. Consequence: `extract`
+  `links` on `basic` now reports six links instead of four, and the P3-01 assertion was updated —
+  the format reports the links a page has, not only the ones it is currently showing.
+
+- Verification gotcha found by the first CI run for this task: piping a check into `tail` makes
+  the pipeline's exit status `tail`'s, so `pnpm lint | tail -3` prints success while biome has
+  failed. That is how a formatter error and an unused binding reached CI from a "green" local
+  run. Run checks unpiped, or under `set -o pipefail`.
 
 ---
 

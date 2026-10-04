@@ -37,6 +37,7 @@ export class PageRegistry {
     this.byPage.set(page, handle);
     this.pagesById.set(handle.id, handle);
     handle.onClose(() => this.pagesById.delete(handle.id));
+    handle.setPageIdsSource(() => [...this.pagesById.keys()]);
 
     // `opener()` is async where `PageHandle.opener()` must be sync, so resolve it once in
     // the background. A page that never gets an opener simply stays null.
