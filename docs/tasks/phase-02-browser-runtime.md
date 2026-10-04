@@ -122,7 +122,32 @@ Runtime dependency added in this phase: `playwright-core` (in `packages/browser`
   - the world is recreated after navigation
 
 **Acceptance criteria**
-- [ ] No `Runtime.enable` anywhere (grep test)
+- [x] No `Runtime.enable` anywhere (grep test)
+
+**Implementation notes**
+- One file added to the card's list: `cdp/playwright.ts` holds `PlaywrightCdpTransport`,
+  `createPageCdp(page)` and the `PAGE_DOMAINS` list. It cannot live in `cdp/transport.ts`,
+  because `createPageCdp` takes a Playwright `Page` and `transport.ts` is re-exported from
+  `src/index.ts` — that would put a Playwright type straight into `dist/index.d.ts` and break
+  the P2-04 criterion. `cdp/playwright.ts` is therefore internal; only `PageHandle.cdp()`
+  reaches it. `cdp/transport.ts`, `counting-transport.ts` and `isolated-worlds.ts` carry no
+  Playwright type and are exported.
+- The `Runtime` guard is behavioural first: `test/cdp.browser.test.ts` subscribes to
+  `Runtime.executionContextCreated` on the page's own transport and asserts nothing arrives,
+  with a **control** session that does enable the domain and does receive events — otherwise
+  the assertion could pass simply because the event never arrives for anyone. The card's grep
+  test is kept alongside it, and it scans every `.ts` under `src/`, not just `cdp/`.
+- `cdp/helpers.js.ts` is a TypeScript file whose *contents* are a JavaScript string, so the
+  compiled name is `helpers.js.js` (the card and spec §4 both name the source that way). The
+  bundle is installed with `Runtime.evaluate` carrying the world's `contextId`, which is the
+  only thing that confines `__bos` to the `bos` world (S19). Re-installing it is a no-op.
+- `probe` and `extract` in the bundle throw with the block that fills them in (P4-09, P3-01),
+  so a caller arriving early fails loudly instead of reading `undefined`.
+- `IsolatedWorlds.get()` de-duplicates concurrent callers through a pending map, so two
+  callers cannot create two worlds in one frame; a failed creation clears the pending entry
+  so a retry is possible.
+- `test/support/raw-page.ts` holds the duck-typed raw-page accessor both browser test files
+  now share (see the P2-04 note about `instanceof` across module graphs).
 
 ---
 

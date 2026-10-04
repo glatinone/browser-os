@@ -1,31 +1,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { launchTestBrowser, type TestBrowser, withFixtureServer } from '@browser-os/tests/helpers';
-import type { Page } from 'playwright-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { PageHandle } from '../src/page-handle.js';
 import { LaunchProvider } from '../src/providers/launch-provider.js';
-
-/**
- * The raw Playwright page, reachable from inside the package that owns it.
- *
- * Duck-typed rather than `instanceof`: a workspace package can be loaded through
- * two module graphs in one test run (Vite's pipeline and Node's ESM loader), which
- * gives two distinct `PageHandleImpl` classes for the same file. Shape is the
- * stable contract here.
- */
-function rawPage(page: PageHandle | undefined): Page {
-  if (page === undefined) throw new Error('the handle has no page');
-  const playwright = (page as { raw?: () => Page }).raw?.();
-  if (playwright === undefined) {
-    throw new Error('this page handle does not expose the raw Playwright page');
-  }
-  return playwright;
-}
-
-function raw(browser: TestBrowser): Page {
-  return rawPage(browser.handle().pages()[0]);
-}
+import { rawFirstPage, rawPage } from './support/raw-page.js';
 
 async function until(predicate: () => boolean, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
@@ -91,7 +69,7 @@ describe('LaunchProvider (browser)', () => {
       browser.handle().onPage((page) => resolve(page.id));
     });
 
-    await raw(browser).evaluate(() => {
+    await rawFirstPage(browser.handle()).evaluate(() => {
       window.open('about:blank');
     });
 
@@ -121,7 +99,7 @@ describe('LaunchProvider (browser)', () => {
 
   it('keeps cookies across a close and relaunch of the same profile', async () => {
     await withFixtureServer(async (server) => {
-      const first = raw(browser);
+      const first = rawFirstPage(browser.handle());
       await first.goto(server.baseUrl);
       await first.evaluate(() => {
         // max-age matters: a bare `document.cookie = ...` is a session cookie, which

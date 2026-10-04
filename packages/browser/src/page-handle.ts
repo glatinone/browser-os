@@ -6,6 +6,7 @@
 
 import { BosError, newId } from '@browser-os/protocol';
 import type { Page } from 'playwright-core';
+import { createPageCdp } from './cdp/playwright.js';
 import type { CdpTransport } from './cdp/transport.js';
 import type { PageDriver } from './driver/types.js';
 
@@ -27,6 +28,7 @@ export class PageHandleImpl implements PageHandle {
   private readonly page: Page;
   private readonly closeCallbacks = new Set<() => void>();
   private openerHandle: PageHandle | null = null;
+  private cdpTransport: Promise<CdpTransport> | null = null;
 
   constructor(page: Page) {
     this.id = newId('pg');
@@ -61,8 +63,14 @@ export class PageHandleImpl implements PageHandle {
     return this.openerHandle;
   }
 
-  async cdp(): Promise<CdpTransport> {
-    throw new BosError('INTERNAL', 'PageHandle.cdp() is implemented in P2-03', {});
+  cdp(): Promise<CdpTransport> {
+    // One session per page (browser-runtime §4), created on first use. A failed creation is
+    // not cached, so a later call can still succeed.
+    this.cdpTransport ??= createPageCdp(this.page).catch((error: unknown) => {
+      this.cdpTransport = null;
+      throw error;
+    });
+    return this.cdpTransport;
   }
 
   driver(): PageDriver {
