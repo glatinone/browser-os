@@ -82,5 +82,16 @@
     if (controlled.value !== controlledState) controlled.value = controlledState;
   }, 25);
 </script>
+<p><button id="slow-fetch" type="button">Load slowly</button> <span id="slow-done">no</span></p>
+<script>
+  // A request the page starts itself, so a settle has something real to wait for.
+  document.getElementById('slow-fetch').addEventListener('click', async () => {
+    document.getElementById('slow-done').textContent = 'loading';
+    // The body is read, so the request actually finishes; a response nobody consumes stays
+    // open as far as the network domain is concerned.
+    await (await fetch('/slow?ms=1500')).json();
+    document.getElementById('slow-done').textContent = 'yes';
+  });
+</script>
 </body>
 </html>

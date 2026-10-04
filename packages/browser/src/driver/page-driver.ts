@@ -17,6 +17,7 @@ import { cdpClick, cdpHover } from './cdp-pointer.js';
 import { EXTRACTION, type ExtractFormat } from './extract.js';
 import type { CdpContext, DriverOutcome } from './op.js';
 import { playwrightPerform } from './playwright-executor.js';
+import { type PageActivity, trackActivity } from './settle.js';
 import type { DriverResult, PageDriver, ResolvedTarget } from './types.js';
 
 export interface DefaultPageDriverDeps {
@@ -34,6 +35,9 @@ export interface DefaultPageDriverDeps {
 const ACTION_GRACE_MS = 500;
 const ACTION_GRACE_POLL_MS = 50;
 
+/** How often `settle` looks at the page while it waits. */
+const SETTLE_POLL_MS = 25;
+
 interface ExceptionDetails {
   text?: string;
   exception?: { description?: string };
@@ -42,6 +46,7 @@ interface ExceptionDetails {
 interface CdpSession {
   transport: CdpTransport;
   worlds: IsolatedWorlds;
+  activity: PageActivity;
 }
 
 export class DefaultPageDriver implements PageDriver {
@@ -178,16 +183,63 @@ export class DefaultPageDriver implements PageDriver {
     };
   }
 
-  async waitForLoadState(_state: 'load' | 'domcontentloaded', _timeoutMs?: number): Promise<void> {
-    throw this.#notYet('waitForLoadState', 'P3-05');
+  async waitForLoadState(state: 'load' | 'domcontentloaded', timeoutMs?: number): Promise<void> {
+    await this.#page.waitForLoadState(state, timeoutMs === undefined ? {} : { timeout: timeoutMs });
   }
 
-  async settle(_quietMs: number, _maxMs: number): Promise<{ waitedMs: number; capped: boolean }> {
-    throw this.#notYet('settle', 'P3-05');
+  /**
+   * Waits until neither the network tracker nor the mutation counter has moved for `quietMs`,
+   * or until `maxMs` runs out. It never throws for timing reasons: a world it cannot read — which
+   * happens while a document is being replaced — counts as activity, not as quiet.
+   */
+  async settle(quietMs: number, maxMs: number): Promise<{ waitedMs: number; capped: boolean }> {
+    const { worlds, activity } = await this.#cdp();
+    const frameId = await this.#mainFrameId();
+    const started = Date.now();
+    let mutations = await this.#mutationCount(worlds, frameId);
+    let mutatedAt = Date.now();
+
+    for (;;) {
+      const elapsed = Date.now() - started;
+      if (elapsed >= maxMs) return { waitedMs: elapsed, capped: true };
+      // The last wait is clipped to the budget, so the cap lands on maxMs rather than a whole poll
+      // after it: the card asks for maxMs + 50 ms, and an extra poll can be more than that.
+      await delay(Math.min(SETTLE_POLL_MS, maxMs - elapsed));
+
+      // Checked again before the reads, which are CDP round trips: on a loaded machine one of them
+      // can outlast the whole remaining budget, and the cap has to be honoured rather than
+      // reported late.
+      const spent = Date.now() - started;
+      if (spent >= maxMs) return { waitedMs: spent, capped: true };
+
+      const count = await this.#mutationCount(worlds, frameId);
+      if (count === null) {
+        mutatedAt = Date.now();
+      } else if (count !== mutations) {
+        mutations = count;
+        mutatedAt = Date.now();
+      }
+
+      const now = Date.now();
+      const quiet = now - activity.lastChange() >= quietMs && now - mutatedAt >= quietMs;
+      if (quiet && activity.inFlight() === 0 && !activity.loading()) {
+        return { waitedMs: now - started, capped: false };
+      }
+    }
   }
 
+  /** How many DOM mutations the page has made in the `bos` world's view of it. */
   async mutationCounter(): Promise<number> {
-    throw this.#notYet('mutationCounter', 'P3-05');
+    const { worlds } = await this.#cdp();
+    return (await this.#mutationCount(worlds, await this.#mainFrameId())) ?? 0;
+  }
+
+  async #mutationCount(worlds: IsolatedWorlds, frameId: string): Promise<number | null> {
+    try {
+      return await worlds.mutationCount(frameId);
+    } catch {
+      return null;
+    }
   }
 
   async uploadFiles(_target: ResolvedTarget, _paths: string[]): Promise<DriverResult> {
@@ -201,7 +253,11 @@ export class DefaultPageDriver implements PageDriver {
   /** One session per page (§4), and the same one `PageHandle.cdp()` hands out. */
   async #cdp(): Promise<CdpSession> {
     this.#session ??= this.#openTransport()
-      .then((transport) => ({ transport, worlds: new IsolatedWorlds(transport) }))
+      .then((transport) => ({
+        transport,
+        worlds: new IsolatedWorlds(transport),
+        activity: trackActivity(transport),
+      }))
       .catch((error: unknown) => {
         // A failed creation is not cached, so a later call can still succeed.
         this.#session = null;
@@ -293,7 +349,7 @@ export class DefaultPageDriver implements PageDriver {
   async #until(reached: () => boolean, timeoutMs: number): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     while (!reached() && Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, ACTION_GRACE_POLL_MS));
+      await delay(ACTION_GRACE_POLL_MS);
     }
   }
 
@@ -327,6 +383,10 @@ function needValue(actionType: string, value: string | undefined): string {
     throw new BosError('INVALID_REQUEST', `A ${actionType} needs a value`, {});
   }
   return value;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** A relative or malformed url is refused before anything is sent. */
