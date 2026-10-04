@@ -20,5 +20,8 @@
     "@browser-os/ai": "workspace:*",
     "@browser-os/memory": "workspace:*",
     "@browser-os/browser": "workspace:*"
+  },
+  "devDependencies": {
+    "@browser-os/tests": "workspace:*"
   }
 }

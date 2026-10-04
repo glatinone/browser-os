@@ -259,6 +259,10 @@ importers:
       '@browser-os/protocol':
         specifier: workspace:*
         version: link:../protocol
+    devDependencies:
+      '@browser-os/tests':
+        specifier: workspace:*
+        version: link:../../tests
 
   packages/sdk:
     dependencies:

@@ -33,7 +33,7 @@ Task cards: `phase-XX-*.md` in this folder. Conflicts and questions: `CONFLICTS.
 | P2-03 | CDP transport, counting wrapper, isolated worlds | P2-04 | review | done |
 | P2-05 | CdpEndpointProvider | P2-04 | cheap | done |
 | P2-06 | Manual setup mode launcher | P2-01, P2-02 | cheap | done |
-| P2-07 | Session manager | P2-04, P2-05 | review | todo |
+| P2-07 | Session manager | P2-04, P2-05 | review | done |
 | **Phase 3** | **Action execution** | | | |
 | P3-01 | PageDriver skeleton, navigate, readValue, extract | P2-03, P2-04 | cheap | todo |
 | P3-02 | CDP click/hover with hit-test and effect semantics | P3-01 | expert | todo |
