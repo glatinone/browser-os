@@ -11,4 +11,6 @@ export * from './events.js';
 export * from './ids.js';
 export * from './model.js';
 export * from './policy.js';
+export * from './rpc.js';
+export * from './schemas.js';
 export * from './tasks.js';
