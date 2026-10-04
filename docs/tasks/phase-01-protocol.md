@@ -25,6 +25,24 @@ All tasks: `supervision: cheap-ok`. Runtime dependency allowed: `zod`.
 **Acceptance criteria**
 - [ ] Types and behaviour match spec exactly
 
+**Implementation notes**
+
+Implemented 2026-10-04. Two choices worth knowing:
+
+- **`ERROR_CODES` is the single source of the `ErrorCode` union**: the array is declared with `as const` and the type is
+  `(typeof ERROR_CODES)[number]`. Adding a code is one edit, the type cannot drift from the list, and tests can enumerate
+  every code — which is how the "retryable defaults for every code" requirement is actually verified. It lives in `errors.ts`,
+  not a new file, because the card fixes the file list.
+- **`ID_PREFIXES` is exported** for the same reason: the test table iterates the real prefix list instead of a copy.
+- `newId` uses the global `crypto.getRandomValues` (no import), 16 bytes for 16 chars. The `% 32` mapping is unbiased
+  because 256 is divisible by 32.
+
+The card's regex is given for `ses_` specifically; prefix lengths differ (`pg` = 2, `perm` = 4), so the test builds the
+pattern per prefix rather than assuming three letters.
+
+Verification: `pnpm build`, `pnpm lint` (boundaries OK), `pnpm test` → 16 files / 56 tests pass. `packages/protocol/src`
+reports 100% statements, branches and lines.
+
 ---
 
 ## P1-02 · Data model types
