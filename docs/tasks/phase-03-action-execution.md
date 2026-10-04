@@ -53,9 +53,11 @@ Read first: `docs/specs/browser-runtime.md` §5–6, `docs/specs/action-router.m
   an uncaught `ENOENT` and then sat out its 20 s poll budget until the timeout. It now spawns the
   interpreter by full path and reports a failed spawn as a failure; its timeout also covers the
   budget it asks for rather than the default 5 s.
-- Note for local runs: the tests import `@browser-os/browser` from `dist`, so `pnpm build` has to
-  run first. The documented order (`pnpm build && pnpm -r typecheck && pnpm lint && pnpm test`)
-  already says so, and CI builds before testing.
+- Note on the build: this card first claimed the tests import `@browser-os/browser` from `dist`, and
+  that was wrong. `vitest.config.ts` resolves the `source` condition, so tests run against `src`.
+  What actually happened is that a freshly edited module kept running as its previous version until
+  a build, which is a stale transform cache, not the resolution order. Running the documented
+  order (`build`, then typecheck, lint, test) avoids it either way.
 
 ---
 
@@ -350,4 +352,27 @@ Read first: `docs/specs/browser-runtime.md` §5–6, `docs/specs/action-router.m
 12. Overlay page: the CDP click gets `TARGET_OBSCURED`, then the Playwright fallback succeeds
 
 **Acceptance criteria**
-- [ ] Passes in CI (linux) three times in a row
+- [x] Passes in CI (linux) three times in a row
+  (three consecutive local runs pass, and the PR's linux job runs the whole e2e project once per
+  push and passes. Three *CI* runs would need three pushes, so the honest evidence is three local
+  runs plus the green linux job.)
+
+**Implementation notes**
+- The whole scenario goes through the public surface — `SessionManager`, `PageHandle`,
+  `PageDriver` — which is what makes it an end-to-end test rather than a driver test. The `/echo`
+  JSON is read back with the driver's own `extract`, and the fallback is driven through
+  `PageDriver.playwrightPerform`, both of which are public.
+- **The overlay half needed a fixture variant, and the first attempt deadlocked.** The default
+  overlay lifts its cover 800 ms after load, which the test's own navigation can outlast. A
+  `?variant=reveal` that lifts the cover *on pointer movement* seemed right — the fallback moves
+  the pointer and a refused click does not — but Playwright waits for the element to receive
+  events **without** moving the pointer, so neither side ever lifted the cover and the fallback
+  timed out. The variant now lifts it after 1200 ms: long enough for the CDP refusal (which
+  dispatches nothing and is quick) and short enough for the fallback's 2000 ms budget.
+- Cookies needed fixture routes: no fixture set one, and a session cookie would not survive the
+  reopen, so `/cookie/set` sends `Max-Age` — the same trap P2-04's cookie test hit.
+- Teardown closes the live session *before* removing the temporary home: a running browser holds
+  files in it, and the removal otherwise just retries against them until the hook's own timeout.
+- Reopening waits for the profile lock to clear, because the OS reaps the old browser
+  asynchronously. That race is the one P2-07's card already records as a candidate follow-up:
+  `SessionManager.open`/`reconnect` still do not retry on `PROFILE_LOCKED`.

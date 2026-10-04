@@ -12,11 +12,18 @@
 <script>
 const cover = document.getElementById('cover');
 const paid = document.getElementById('paid');
+const revealOnMove = new URLSearchParams(location.search).get('variant') === 'reveal';
 document.getElementById('covered-button').addEventListener('click', () => { paid.hidden = false; });
 function removeCover() { cover.style.display = 'none'; }
 cover.addEventListener('click', removeCover);
 document.addEventListener('click', () => setTimeout(removeCover, 0));
-setTimeout(removeCover, 800);
+if (revealOnMove) {
+  // The CDP click refuses this in a few hundred milliseconds, and the Playwright fallback then
+  // waits for the element to receive events: this is the window in which the second one wins.
+  setTimeout(removeCover, 1200);
+} else {
+  setTimeout(removeCover, 800);
+}
 </script>
 </body>
 </html>

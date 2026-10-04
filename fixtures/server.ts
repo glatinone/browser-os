@@ -69,6 +69,21 @@ function handle(req: IncomingMessage, res: ServerResponse, url: URL): Promise<vo
     });
   }
 
+  if (url.pathname === '/cookie/set') {
+    return send(res, 200, 'set\n', {
+      'Content-Type': 'text/plain; charset=utf-8',
+      // Max-Age matters: a session cookie is never written to disk, so it would not survive the
+      // browser being closed and reopened.
+      'Set-Cookie': `bos=${encodeURIComponent(url.searchParams.get('value') ?? '')}; Path=/; Max-Age=3600`,
+    });
+  }
+
+  if (url.pathname === '/cookie/get') {
+    return send(res, 200, JSON.stringify({ cookie: req.headers.cookie ?? '' }), {
+      'Content-Type': 'application/json; charset=utf-8',
+    });
+  }
+
   if (url.pathname === '/slow') {
     const ms = Math.min(Number(url.searchParams.get('ms') ?? '0') || 0, 10000);
     return new Promise<void>((resolve) => {
