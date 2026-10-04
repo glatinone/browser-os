@@ -71,7 +71,21 @@ Runtime dependency added in this phase: `playwright-core` (in `packages/browser`
 **Tests:** temp dirs; name validation table; traversal attempts (`../x`, absolute path elsewhere, symlink escape on POSIX); stale lock vs live lock (spawn a dummy process holding the pid on POSIX; on Windows, hold the file open in the test).
 
 **Acceptance criteria**
-- [ ] S1 covered
+- [x] S1 covered
+
+**Implementation notes**
+- **The Windows lock probe works, but the card's Windows *test* cannot.** Measured against a real
+  Chrome 154 profile on Windows 11: Chrome creates an empty `lockfile` (no `SingletonLock`, no
+  pid) and holds it with an exclusive share mode, so `fs.open(lockfile, 'r+')` fails with `EBUSY`
+  while it is alive and succeeds once it is gone. But Node always opens with
+  `FILE_SHARE_READ|WRITE|DELETE`, so a *Node* holder is never exclusive and the probe would
+  succeed — "hold the file open in the test" does not reproduce a lock. `test/profiles.test.ts`
+  therefore holds it with a PowerShell `FileShare.None` handle, which does produce `EBUSY`.
+- `profileDir` is pure path arithmetic and does **not** validate `name`; `assertInsideProfiles` is
+  the guard (S1) and must be applied by whoever accepts a directory from outside. `ensureProfileDir`
+  does not call it: the name is validated first, so its result is inside by construction.
+- `isProfileLocked` decides staleness per platform rather than by the file's existence, because
+  Chrome never deletes lock files and Browser-OS does not either (SECURITY §2).
 
 ---
 
