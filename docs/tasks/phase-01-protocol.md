@@ -65,6 +65,26 @@ reports 100% statements, branches and lines.
 **Acceptance criteria**
 - [ ] `pnpm -r typecheck` passes; types identical to spec
 
+**Implementation notes**
+
+Implemented 2026-10-04. Notes for the next agent:
+
+- All eight files from the card exist and mirror `data-models.md` §3–§10 field for field, comments included. Every
+  cross-file reference uses `import type`, so the modules have no runtime dependency on each other and `index.ts` can
+  re-export all of them in dependency order without a cycle.
+- **`TARGETLESS` vs `hasTarget`.** The spec comment lists the targetless types as "navigate, wait, (press|scroll|extract
+  when target undefined)". A `Set` cannot express a conditional, so `TARGETLESS` holds only `navigate` and `wait` while
+  `hasTarget(action)` answers the real question per action (`'target' in action && action.target !== undefined`). Both are
+  required by the card and both are tested.
+- `DEFAULT_POLICY` and `mergePolicy` live in `policy.ts` together with `DeepPartial`. `mergePolicy` merges nested objects
+  key by key and **replaces** arrays (an override listing three upload directories means exactly three); `sites` is replaced
+  wholesale because order decides which policy matches first.
+- `ActionResult.risk` is `RiskLevel | null` and `error.details` is `Record<string, unknown>` as fixed by integration §3.
+
+Verification: `pnpm build`, `pnpm lint` (boundaries OK), `pnpm test` → 17 files / 67 tests pass. The `types.test.ts`
+`expectTypeOf` assertions are the compile-time proof that the discriminated unions kept their shapes: `pnpm build` fails
+if they drift.
+
 ---
 
 ## P1-03 · Zod schemas and RPC method table

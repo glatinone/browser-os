@@ -23,7 +23,7 @@ Task cards: `phase-XX-*.md` in this folder. Conflicts and questions: `CONFLICTS.
 | P0-04 | Fixture server and fixture sites | P0-01 | cheap | done |
 | **Phase 1** | **Protocol** | | | |
 | P1-01 | IDs and errors | P0-01 | cheap | done |
-| P1-02 | Data model types | P1-01 | cheap | todo |
+| P1-02 | Data model types | P1-01 | cheap | done |
 | P1-03 | Zod schemas and RPC method table | P1-02 | cheap | todo |
 | P1-04 | Masking, EventBus, paths, target syntax | P1-02 | cheap | todo |
 | **Phase 2** | **Browser runtime** | | | |
