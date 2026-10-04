@@ -1,0 +1,648 @@
+**Browser-OS masuk akal**, malah menurut saya lebih cocok daripada "BrowserSkill Ultra" kalau visi akhirnya memang besar.
+
+ Bedanya:
+
+ - **BrowserSkill** terdengar seperti _tool/skill_ untuk mengontrol browser.
+- **Browser Agent** terdengar seperti AI yang mengerjakan task di browser.
+- **Browser-OS** terdengar seperti **runtime/platform tempat browser, session, automation, AI, memory, dan agent hidup bersama**.
+
+ Dan dari rancangan kita, yang dibangun memang sudah mendekati yang ketiga.
+
+ ### Saya akan definisikan Browser-OS seperti ini
+
+ > **Browser-OS is an AI-native operating layer for the modern web. It provides persistent browser sessions, deterministic automation, AI reasoning, memory, security, and adaptive execution through real Chromium-based browsers.**
+
+ Atau lebih singkat:
+
+ > **Browser-OS — an operating system for AI-native web interaction.**
+
+ Arsitekturnya jadi lebih masuk akal:
+
+```
+                    Browser-OS
+┌───────────────────────────────────────────────┐
+│                                               │
+│             AI / Agent Runtime                │
+│                                               │
+│   Planner · Memory · Policy · Model Router    │
+│                     │                         │
+│                     ▼                         │
+│              Action Runtime                   │
+│                                               │
+│   Cache → DOM → CDP → LLM → Vision → Human   │
+│                     │                         │
+│                     ▼                         │
+│              Browser Runtime                  │
+│                                               │
+│   Chrome · Chromium · Edge · Profiles        │
+│                     │                         │
+│                     ▼                         │
+│                 INTERNET                      │
+│                                               │
+└───────────────────────────────────────────────┘
+```
+
+ Dan kata **OS** memberi ruang untuk berkembang jauh lebih besar.
+
+ Misalnya nanti ada:
+
+ - **Browser Processes** — browser/session lifecycle
+- **BrowserFS** — cookies, storage, downloads, artifacts
+- **Browser Memory** — learned workflows
+- **Browser Network** — proxy/network policies
+- **Browser Identity** — profiles/accounts
+- **Browser Permissions** — action authorization
+- **Browser Apps** — automation skills
+- **Browser Agents** — autonomous workers
+- **Browser Kernel** — CDP/action runtime
+- **Browser Scheduler** — background tasks
+- **Browser Observability** — traces/telemetry
+
+ Jadi secara konseptual:
+
+```
+Chrome = hardware/runtime
+Browser-OS = operating layer
+Agent = application
+Skill = application/module
+Website = external system
+```
+
+ Itu **jauh lebih kuat sebagai positioning**.
+
+ ### Satu hal yang perlu kita putuskan
+
+ Saya akan mengubah dokumen master tadi dari:
+
+ > **BrowserSkill Ultra**
+
+ menjadi:
+
+ > **Browser-OS**
+
+ dan mengubah tujuan proyek dari _"browser agent yang cepat"_ menjadi:
+
+ > **Build an AI-native operating layer for the web that makes real browsers programmable, persistent, intelligent, and extremely efficient.**
+
+ Kemudian **BrowserSkill, Playwright, CDP, Stagehand, Browser Use, Steel** semuanya bukan identitas produk lagi. Mereka menjadi **referensi/komponen/inspirasi yang bisa dipasang di bawah Browser-OS**.
+
+ Menurut saya ini framing yang jauh lebih bagus untuk proyek jangka panjang.
+
+Iya. Setelah saya cek implementasi yang **sekarang**, saya akan menyederhanakan jawabannya:
+
+ > **Belum ada yang 1:1 dengan Browser-OS yang kita bayangkan.**
+>
+>  Tapi komponennya sudah tersebar di beberapa project. Justru peluang Browser-OS adalah **menggabungkan bagian terbaik mereka menjadi satu runtime yang fokus pada real logged-in browser + adaptive execution + performance**.
+
+ Dan ternyata BrowserSkill sendiri lebih canggih secara arsitektur daripada yang kelihatan dari luar. Dokumentasi arsitekturnya sekarang menunjukkan **CLI → daemon → WebSocket → Chromium extension → CDP**, dengan session management dan Agent Window isolation.  GitHub+1
+
+ ## Jadi stack sederhananya
+
+ Kalau kita coret semua yang tidak perlu:
+
+```
+                    Browser-OS
+                         │
+                 ┌───────▼───────┐
+                 │  Agent Router │
+                 └───────┬───────┘
+                         │
+            ┌────────────┼────────────┐
+            ▼            ▼            ▼
+          CACHE         DOM         VISION
+            │            │            │
+            ▼            ▼            ▼
+           CDP       Small LLM    Vision LLM
+            │            │            │
+            └────────────┼────────────┘
+                         ▼
+                  Browser Runtime
+                         │
+                  ┌──────┴──────┐
+                  ▼             ▼
+               Chrome          Edge
+                  │
+             real profile
+             real cookies
+             real login
+             extensions
+                  │
+                  ▼
+                Web
+```
+
+ ### Core stack saya:
+
+ **1\. Chromium / Chrome / Edge**
+
+ Browser asli. **Ini jangan diganti** untuk MVP.
+
+ **2\. CDP**
+
+ Low-level communication dengan browser.
+
+ BrowserSkill sendiri memang menggunakan CDP melalui extension-nya.  GitHub
+
+ **3\. Playwright**
+
+ Untuk automation API yang sudah matang.
+
+ **4\. DOM extraction/compression**
+
+ Kita bikin sendiri sebagai bagian Browser-OS.
+
+ **5\. Action Router**
+
+ Ini juga bagian yang kita bikin sendiri:
+
+```
+cache
+ ↓
+DOM
+ ↓
+CDP
+ ↓
+small LLM
+ ↓
+vision
+ ↓
+human
+```
+
+ **6\. Persistent session/profile**
+
+ Ini salah satu inti Browser-OS.
+
+ **7\. Memory/cache**
+
+ Ini yang membuat sistem semakin cepat pada workflow yang berulang.
+
+ **8\. LLM provider abstraction**
+
+ Bisa OpenAI/Gemini/Anthropic/local model/vLLM/Ollama.
+
+ **9\. Vision fallback**
+
+ Hanya dipanggil kalau DOM + reasoning biasa gagal.
+
+---
+
+ # Apakah sudah ada yang 1:1?
+
+ **Tidak persis.**
+
+ Tapi ada 4 project yang sangat dekat.
+
+ ## 1\. BrowserSkill — paling dekat dengan "browser layer"
+
+ Ini **fondasi paling dekat** dengan apa yang kita inginkan.
+
+ BrowserSkill:
+
+```
+Agent
+ ↓
+CLI
+ ↓
+Daemon
+ ↓
+WebSocket
+ ↓
+Chrome Extension
+ ↓
+CDP
+ ↓
+Chrome/Edge
+```
+
+ Ia bisa memakai browser yang sudah login, mempertahankan user session, dan punya Agent Window.  GitHub+1
+
+ Bahkan concurrency/session isolation sudah dipikirkan.
+
+ **Yang belum menjadi fokus utamanya:** kita ingin menambahkan **adaptive execution + trajectory learning + aggressive performance optimization** sebagai inti produknya.
+
+ Jadi BrowserSkill bisa dianggap:
+
+ > **Browser-OS kernel prototype/reference #1**
+
+---
+
+ # 2\. Stagehand — paling dekat dengan "AI execution layer"
+
+ Stagehand melakukan hal yang sangat menarik:
+
+```
+code
+ +
+AI
+```
+
+ dan menyediakan primitive seperti:
+
+```
+act()
+observe()
+extract()
+```
+
+ yang bisa dicampur dengan Playwright.  Stagehand+1
+
+ Yang bahkan sangat relevan dengan ide kita:
+
+ > Stagehand punya caching/self-healing sehingga workflow yang sudah diketahui dapat dijalankan kembali tanpa selalu melakukan LLM inference.  GitHub
+
+ **Ini sangat dekat dengan konsep Browser-OS kita.**
+
+ Bedanya:
+
+ Stagehand:
+
+ > "AI browser automation SDK"
+
+ Browser-OS:
+
+ > "browser runtime + session OS + AI execution + memory \+ policy"
+
+ Jadi Stagehand bisa menjadi **inspiration/component**, bukan necessarily dependency wajib.
+
+---
+
+ # 3\. Steel — paling dekat dengan "browser infrastructure"
+
+ Steel menangani:
+
+```
+Browser
+Session
+Page
+Cookies
+Local storage
+Extensions
+CDP
+Lifecycle
+```
+
+ dan menyediakan browser API untuk AI agents. Ia juga open source dan bisa self-hosted.  GitHub+1
+
+ Arsitekturnya bahkan punya CDP service dan session management sebagai core components.  GitHub
+
+ Jadi Steel adalah:
+
+ > **Browser infrastructure layer**
+
+ Sedangkan Browser-OS ingin:
+
+ > **Browser infrastructure + execution intelligence \+ memory + agent runtime**
+
+---
+
+ # 4\. Browser Use — paling dekat dengan "Agent"
+
+ Browser Use berada lebih tinggi:
+
+```
+User
+ ↓
+Agent
+ ↓
+Browser
+```
+
+ Jadi dia lebih banyak menyelesaikan:
+
+ > "Tolong lakukan task ini."
+
+ Sedangkan Browser-OS harus menyelesaikan:
+
+ > "Berikan agent sebuah browser runtime yang sangat cepat, persistent, programmable, dan intelligent."
+
+---
+
+ # Jadi sebenarnya kita tidak perlu membuat semuanya dari nol
+
+ Ini poin yang sangat penting.
+
+ Saya **tidak menyarankan**:
+
+```
+❌ fork BrowserSkill
+❌ fork Stagehand
+❌ fork Steel
+❌ fork Browser Use
+❌ gabungkan semuanya menjadi monster dependency
+```
+
+ Itu malah akan menjadi sulit dipelihara.
+
+ Saya lebih suka:
+
+```
+                    Browser-OS
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │
+        ▼                ▼                ▼
+ Browser Runtime    AI Runtime       Memory Runtime
+        │                │                │
+     CDP/Chrome       Models          Cache/DB
+        │                │                │
+        └────────────────┼────────────────┘
+                         │
+                  Browser-OS API
+```
+
+ Dengan dependency minimal.
+
+---
+
+ # Yang benar-benar kita "buat sendiri"
+
+ Ini justru bagian yang membedakan Browser-OS.
+
+ ### A. Adaptive Action Router
+
+```
+Can cache solve?
+       │
+      yes ─────→ execute
+       │
+       no
+       ▼
+Can DOM solve?
+       │
+      yes ─────→ execute
+       │
+       no
+       ▼
+Can small model solve?
+       │
+      yes ─────→ execute
+       │
+       no
+       ▼
+Vision
+       │
+       no
+       ▼
+Human
+```
+
+ **Ini jantung Browser-OS.**
+
+---
+
+ ### B. Trajectory Memory
+
+ Misalnya pertama kali:
+
+```
+"Download invoice April"
+```
+
+ AI perlu eksplorasi.
+
+ Browser-OS merekam:
+
+```
+open billing
+→ click invoices
+→ filter April
+→ click download
+```
+
+ Lalu menyimpan:
+
+```
+intent → trajectory
+```
+
+ Run kedua:
+
+```
+intent
+ ↓
+trajectory cache
+ ↓
+CDP
+ ↓
+DONE
+```
+
+ Ini yang membuat agent **semakin cepat seiring pemakaian**.
+
+---
+
+ ### C. DOM Compression
+
+ Ini juga sangat penting.
+
+ Jangan:
+
+```
+HTML 2 MB
+ ↓
+LLM
+```
+
+ Tetapi:
+
+```
+HTML
+ ↓
+interactive elements
+ ↓
+semantic representation
+ ↓
+relevant elements
+ ↓
+LLM
+```
+
+ Misalnya 2 MB DOM menjadi:
+
+```
+{
+  "buttons": [
+    {"id": 1, "name": "Search"},
+    {"id": 2, "name": "Messages"}
+  ],
+  "inputs": [
+    {"id": 3, "placeholder": "Search"}
+  ]
+}
+```
+
+ Model hanya melihat yang penting.
+
+---
+
+ # Dan ini yang menurut saya paling penting
+
+ **Browser-OS jangan menjadi "AI browser".**
+
+ Itu positioning yang terlalu sempit.
+
+ Browser-OS sebaiknya menjadi:
+
+ > **execution layer antara AI dan web.**
+
+ Jadi agent apa pun bisa menggunakan Browser-OS:
+
+```
+Claude
+Gemini
+GPT
+Codex
+Cursor
+custom agent
+local LLM
+your own AI
+       │
+       ▼
+┌─────────────────┐
+│   Browser-OS    │
+└────────┬────────┘
+         │
+      Chrome
+         │
+        Web
+```
+
+ Ini juga konsisten dengan BrowserSkill saat ini: BrowserSkill sendiri menyediakan browser connection sementara agent/model bisa dipilih oleh pengguna.  GitHub
+
+---
+
+ # Jadi tech stack final yang saya rekomendasikan
+
+ Untuk **MVP**, saya akan bikin sesederhana ini:
+
+```
+Language
+└── TypeScript
+
+Browser
+└── Chromium / Chrome / Edge
+
+Browser control
+└── CDP
+
+Automation
+└── Playwright
+
+Extension
+└── Chrome MV3
+
+AI
+└── provider-agnostic
+    ├── OpenAI
+    ├── Gemini
+    ├── Anthropic
+    └── local models
+
+DOM
+└── custom semantic extractor
+
+Memory
+└── SQLite
+
+Cache
+└── SQLite + in-memory
+
+IPC
+└── WebSocket / local IPC
+
+CLI
+└── Node/TypeScript
+
+Observability
+└── OpenTelemetry
+
+Vision
+└── pluggable provider
+```
+
+ **Tidak perlu Lightpanda untuk MVP.**
+
+ Lightpanda nanti bisa menjadi:
+
+```
+BrowserProvider
+├── ChromiumProvider  ← default
+├── EdgeProvider
+└── LightpandaProvider ← optional
+```
+
+ Jadi kita tidak kehilangan kompatibilitas.
+
+---
+
+ # Dan kalau saya harus memilih "siapa melakukan apa"
+
+ | Komponen | Ambil dari | Browser-OS |
+| --- | --- | --- |
+| Real browser connection | BrowserSkill | adaptasi |
+| CDP | Chromium | gunakan |
+| Automation | Playwright | gunakan |
+| AI primitives | Stagehand | inspirasi/integrasi |
+| Browser sessions | Steel | adaptasi konsep |
+| Agent reasoning | Browser Use | referensi |
+| DOM compression | — | **buat sendiri** |
+| Action router | — | **buat sendiri** |
+| Trajectory memory | Stagehand + konsep sendiri | **buat sendiri** |
+| Adaptive execution | — | **buat sendiri** |
+| Performance policy | — | **buat sendiri** |
+| Browser OS API | — | **buat sendiri** |
+
+Dan justru **4 item terakhir itulah IP/identitas Browser-OS**.
+
+---
+
+ ## Kalau dibuat sangat sederhana
+
+ Bayangkan kita punya 3 layer saja:
+
+```
+┌──────────────────────────┐
+│        AI AGENT          │
+│ GPT / Gemini / Claude    │
+└────────────┬─────────────┘
+             │
+             ▼
+┌──────────────────────────┐
+│       BROWSER-OS         │
+│                          │
+│ Router                   │
+│ Memory                   │
+│ DOM                      │
+│ Actions                  │
+│ Security                 │
+│ Sessions                 │
+└────────────┬─────────────┘
+             │
+             ▼
+┌──────────────────────────┐
+│       REAL BROWSER       │
+│                          │
+│ Chrome / Edge / Chromium │
+│ CDP + Extension          │
+└──────────────────────────┘
+```
+
+ **Itu sebenarnya produk kita.**
+
+ Bukan browser baru.
+
+ Bukan LLM baru.
+
+ Bukan Playwright baru.
+
+ Bukan Browser Use clone.
+
+ **Browser-OS adalah orchestration/runtime layer yang membuat semuanya bekerja sebagai satu sistem.**
+
+ Dan setelah saya cek project-project yang ada sekarang, saya cukup yakin framing ini **lebih tepat daripada mencoba mencari satu project yang sudah 1:1**. Stagehand sudah punya kombinasi code + AI + caching; Steel sudah punya browser/session infrastructure; BrowserSkill sudah punya real logged-in Chrome/Edge + extension + CDP + daemon; tetapi saya belum menemukan satu project yang menyatukan semuanya dengan **adaptive execution sebagai prinsip inti**.  GitHub+2
+
+ **Kalau kita lanjut membangun, saya sarankan langkah berikutnya bukan coding dulu.** Kita bikin satu dokumen `ARCHITECTURE.md` yang benar-benar menentukan **mana yang kita fork, mana yang dependency, mana yang kita tulis sendiri, dan bagaimana data/action flow-nya**. Itu akan menjadi blueprint yang bisa langsung diberikan ke AI coding harness agar dia tidak "halusinasi arsitektur" ketika mulai implementasi.
+
+
+

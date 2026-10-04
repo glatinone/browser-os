@@ -1,0 +1,2223 @@
+Siap. Karena ini akan menjadi **dokumen teknis utama yang diberikan ke AI coding harness**, saya buat `ARCHITECTURE.md` dalam bentuk yang cukup preskriptif: agent harus tahu apa yang dibangun, apa yang tidak dibangun, dependency mana yang dipakai, boundary antar-komponen, dan urutan implementasinya.
+
+ # Browser-OS Architecture
+
+ > **Status:** Architecture Specification\
+>  **Version:** 0.1\
+>  **Project:** Browser-OS\
+>  **Primary goal:** Build a high-performance, local-first execution layer between AI agents and the modern web.
+
+---
+
+ # 1\. Executive Summary
+
+ Browser-OS is an **AI-native browser execution runtime**.
+
+ It is not:
+
+ - a new browser engine
+- a browser UI
+- an LLM
+- a browser automation clone
+- a screenshot-based computer-use system
+
+ Browser-OS sits between an AI agent and a real browser.
+
+```
+┌─────────────────────────────────────────────┐
+│                  AI AGENT                   │
+│                                             │
+│ GPT / Gemini / Claude / Local Agent / etc.  │
+└──────────────────────┬──────────────────────┘
+                       │
+                       │ Browser-OS API
+                       ▼
+┌─────────────────────────────────────────────┐
+│                 BROWSER-OS                 │
+│                                             │
+│  Agent Runtime                              │
+│  Action Router                              │
+│  DOM Intelligence                           │
+│  Memory / Cache                              │
+│  Session Manager                             │
+│  Security / Policy                           │
+│  Observability                               │
+└──────────────────────┬──────────────────────┘
+                       │
+                       │ CDP / Playwright
+                       ▼
+┌─────────────────────────────────────────────┐
+│              REAL BROWSER                  │
+│                                             │
+│ Chrome / Chromium / Edge                    │
+│                                             │
+│ Persistent Profile                          │
+│ Cookies                                     │
+│ LocalStorage                                │
+│ Extensions                                  │
+│ Authentication                              │
+└──────────────────────┬──────────────────────┘
+                       │
+                       ▼
+                    INTERNET
+```
+
+ The central architectural principle is:
+
+ > **Use the cheapest and most deterministic mechanism capable of completing the action.**
+
+ Execution priority:
+
+```
+Cache
+  ↓
+Deterministic DOM/CDP
+  ↓
+Semantic DOM reasoning
+  ↓
+Fast/small LLM
+  ↓
+Vision / Computer Use
+  ↓
+Human takeover
+```
+
+---
+
+ # 2\. Core Design Principles
+
+ ## 2.1 AI is not the default executor
+
+ Do not invoke an LLM for an action that can be executed deterministically.
+
+ Bad:
+
+```
+LLM
+ ↓
+click
+ ↓
+LLM
+ ↓
+type
+ ↓
+LLM
+ ↓
+scroll
+```
+
+ Preferred:
+
+```
+Task
+ ↓
+Router
+ ↓
+known workflow
+ ↓
+direct browser actions
+```
+
+---
+
+ # 2.2 DOM before vision
+
+ The system must prefer structured browser information over screenshots.
+
+ Preferred:
+
+```
+DOM
+ ↓
+semantic extraction
+ ↓
+element resolution
+```
+
+ Only use vision when DOM-based methods fail or are insufficient.
+
+---
+
+ # 2.3 Real browser before alternative browser engines
+
+ The default browser runtime is:
+
+ - Chrome
+- Chromium
+- Edge
+
+ The system must prioritize compatibility with real-world websites over synthetic browser benchmarks.
+
+ This is especially important for:
+
+ - Microsoft Entra
+- Google SSO
+- LinkedIn
+- Instagram
+- Salesforce
+- Slack
+- internal enterprise applications
+- extensions
+- WebAuthn/passkeys
+- complex SPAs
+
+ Alternative browser engines such as Lightpanda may be supported later as optional providers.
+
+---
+
+ # 2.4 Persistent sessions are first-class
+
+ Browser-OS should treat browser sessions as persistent resources.
+
+ Do not create a fresh browser for every task unless explicitly requested.
+
+ Preferred:
+
+```
+Browser Manager
+     │
+     ├── Profile A
+     ├── Profile B
+     ├── Profile C
+     └── Profile N
+```
+
+ Profiles may contain:
+
+ - cookies
+- localStorage
+- sessionStorage
+- extensions
+- browser settings
+- authentication state
+
+---
+
+ # 2.5 Learn successful workflows
+
+ Every successful workflow should have the opportunity to become cheaper and faster.
+
+ First run:
+
+```
+Task
+ ↓
+Explore
+ ↓
+Reason
+ ↓
+Execute
+ ↓
+Record
+```
+
+ Later run:
+
+```
+Task
+ ↓
+Cache
+ ↓
+Execute
+```
+
+ The system should progressively reduce:
+
+ - LLM calls
+- tokens
+- screenshots
+- DOM processing
+- browser startup
+- reasoning latency
+
+---
+
+ # 2.6 Everything should be replaceable
+
+ Vendor-specific components must not leak into the core architecture.
+
+ Use interfaces for:
+
+```
+BrowserProvider
+ModelProvider
+VisionProvider
+ActionExecutor
+MemoryProvider
+CacheProvider
+SessionProvider
+```
+
+ This allows the project to change:
+
+ - browser
+- model
+- automation library
+- storage
+- AI provider
+
+ without rewriting the entire system.
+
+---
+
+ # 3\. High-Level Architecture
+
+```
+                             USER / AI AGENT
+                                    │
+                                    ▼
+                         ┌────────────────────┐
+                         │   Agent Runtime    │
+                         └─────────┬──────────┘
+                                   │
+                                   ▼
+                         ┌────────────────────┐
+                         │    Task Router     │
+                         └─────────┬──────────┘
+                                   │
+                    ┌──────────────┼──────────────┐
+                    │              │              │
+                    ▼              ▼              ▼
+                 Memory           DOM           Vision
+                 /Cache       Intelligence      Fallback
+                    │              │              │
+                    └──────────────┼──────────────┘
+                                   │
+                                   ▼
+                         ┌────────────────────┐
+                         │  Action Planner    │
+                         └─────────┬──────────┘
+                                   │
+                                   ▼
+                         ┌────────────────────┐
+                         │  Action Executor   │
+                         └─────────┬──────────┘
+                                   │
+                         ┌─────────┴─────────┐
+                         │                   │
+                         ▼                   ▼
+                    Playwright              CDP
+                         │                   │
+                         └─────────┬─────────┘
+                                   │
+                                   ▼
+                         ┌────────────────────┐
+                         │  Browser Manager   │
+                         └─────────┬──────────┘
+                                   │
+                    ┌──────────────┼──────────────┐
+                    ▼              ▼              ▼
+                 Chrome         Chromium         Edge
+                    │
+                    ▼
+                  WEB
+```
+
+---
+
+ # 4\. Major Components
+
+ Browser-OS consists of the following logical subsystems:
+
+```
+core/
+browser/
+actions/
+dom/
+ai/
+memory/
+security/
+telemetry/
+cli/
+benchmarks/
+```
+
+---
+
+ # 5\. Core Runtime
+
+ Location:
+
+```
+core/
+```
+
+ Responsibilities:
+
+ - task lifecycle
+- agent execution
+- orchestration
+- routing
+- state management
+- cancellation
+- retries
+
+ Core objects:
+
+```
+Task
+Session
+Page
+Action
+Observation
+Execution
+Result
+```
+
+---
+
+ # 6\. Agent Runtime
+
+ The Agent Runtime receives high-level instructions.
+
+ Example:
+
+```
+"Open LinkedIn and search for John Smith."
+```
+
+ It converts this into a task.
+
+ The Agent Runtime should NOT directly manipulate Chrome.
+
+ Instead:
+
+```
+Agent Runtime
+      ↓
+Task Router
+      ↓
+Action Planner
+      ↓
+Action Executor
+```
+
+ This separation is critical.
+
+---
+
+ # 7\. Task Model
+
+ Example:
+
+```
+interface Task {
+  id: string;
+  instruction: string;
+  sessionId: string;
+  createdAt: number;
+  timeoutMs?: number;
+  metadata?: Record<string, unknown>;
+}
+```
+
+---
+
+ # 8\. Session Model
+
+```
+interface BrowserSession {
+  id: string;
+  profileId: string;
+  browserType: BrowserType;
+  status: SessionStatus;
+  cdpEndpoint?: string;
+  createdAt: number;
+  lastUsedAt: number;
+}
+```
+
+ A session represents a reusable browser environment.
+
+---
+
+ # 9\. Browser Manager
+
+ Location:
+
+```
+browser/manager/
+```
+
+ Responsibilities:
+
+ - launch browser
+- attach to browser
+- reconnect
+- detect crashes
+- manage profiles
+- manage sessions
+- discover pages
+- create pages
+- close pages
+- maintain lifecycle
+
+ Interface:
+
+```
+interface BrowserManager {
+  launch(options: LaunchOptions): Promise<BrowserSession>;
+
+  attach(options: AttachOptions): Promise<BrowserSession>;
+
+  getSession(id: string): Promise<BrowserSession | null>;
+
+  listSessions(): Promise<BrowserSession[]>;
+
+  closeSession(id: string): Promise<void>;
+
+  reconnect(id: string): Promise<BrowserSession>;
+}
+```
+
+---
+
+ # 10\. Browser Provider
+
+ Browser-OS must abstract the browser implementation.
+
+```
+interface BrowserProvider {
+  launch(options: LaunchOptions): Promise<BrowserSession>;
+
+  attach(options: AttachOptions): Promise<BrowserSession>;
+
+  close(sessionId: string): Promise<void>;
+}
+```
+
+ Initial providers:
+
+```
+ChromiumProvider
+ChromeProvider
+EdgeProvider
+```
+
+ Future:
+
+```
+LightpandaProvider
+RemoteBrowserProvider
+```
+
+---
+
+ # 11\. CDP Layer
+
+ Location:
+
+```
+browser/cdp/
+```
+
+ CDP is the low-level browser control layer.
+
+ Use CDP for:
+
+ - Runtime
+- DOM
+- Page
+- Input
+- Network
+- Target
+- Storage
+- Browser
+
+ The CDP layer should remain thin.
+
+ Do not build an entire browser automation framework on top of CDP unless there is a concrete reason.
+
+---
+
+ # 12\. Playwright Layer
+
+ Location:
+
+```
+browser/playwright/
+```
+
+ Playwright provides high-level browser automation.
+
+ Use it when:
+
+ - selectors are reliable
+- navigation is required
+- frame handling is needed
+- browser abstractions simplify implementation
+- reliability is more important than micro-optimization
+
+ CDP should be preferred when direct protocol access materially reduces overhead.
+
+---
+
+ # 13\. Action Executor
+
+ Location:
+
+```
+actions/
+```
+
+ The Action Executor is responsible for actually executing browser operations.
+
+ Supported primitives:
+
+```
+navigate
+click
+type
+fill
+press
+scroll
+hover
+select
+drag
+upload
+download
+wait
+extract
+screenshot
+openTab
+closeTab
+switchTab
+focusFrame
+```
+
+ Interface:
+
+```
+interface ActionExecutor {
+  execute(
+    action: BrowserAction,
+    context: ExecutionContext
+  ): Promise<ActionResult>;
+}
+```
+
+---
+
+ # 14\. Action Representation
+
+ Actions should be structured.
+
+ Example:
+
+```
+{
+  "type": "click",
+  "target": {
+    "elementId": "e_382"
+  }
+}
+```
+
+ Not:
+
+```
+"click somewhere around x=383 y=412"
+```
+
+ Coordinates should be a fallback.
+
+---
+
+ # 15\. Action Resolution
+
+ A target may be resolved through:
+
+```
+1. cached element strategy
+2. semantic DOM
+3. selector
+4. accessibility tree
+5. small LLM
+6. vision
+```
+
+ The system should record which strategy succeeded.
+
+---
+
+ # 16\. DOM Intelligence
+
+ Location:
+
+```
+dom/
+```
+
+ Components:
+
+```
+dom/parser/
+dom/semantic/
+dom/compressor/
+dom/locator/
+```
+
+ Responsibilities:
+
+ - inspect DOM
+- identify interactive elements
+- calculate semantic properties
+- assign internal IDs
+- compress DOM
+- resolve elements
+
+---
+
+ # 17\. Semantic Element
+
+ Internal representation:
+
+```
+interface SemanticElement {
+  id: string;
+
+  tag?: string;
+
+  role?: string;
+
+  text?: string;
+
+  ariaLabel?: string;
+
+  placeholder?: string;
+
+  name?: string;
+
+  value?: string;
+
+  visible: boolean;
+
+  enabled: boolean;
+
+  bbox?: BoundingBox;
+
+  frameId?: string;
+
+  attributes?: Record<string, string>;
+}
+```
+
+---
+
+ # 18\. DOM Compression
+
+ Never send raw page HTML to an LLM.
+
+ Pipeline:
+
+```
+HTML / DOM
+    ↓
+DOM parser
+    ↓
+interactive elements
+    ↓
+semantic normalization
+    ↓
+visibility filtering
+    ↓
+relevance filtering
+    ↓
+context compression
+    ↓
+LLM
+```
+
+ Example compressed context:
+
+```
+{
+  "page": {
+    "url": "https://example.com",
+    "title": "Example"
+  },
+  "elements": [
+    {
+      "id": "e1",
+      "role": "textbox",
+      "name": "Search"
+    },
+    {
+      "id": "e2",
+      "role": "button",
+      "name": "Submit"
+    }
+  ]
+}
+```
+
+---
+
+ # 19\. Action Router
+
+ Location:
+
+```
+core/router/
+```
+
+ This is the central Browser-OS innovation.
+
+ The router chooses the cheapest viable execution method.
+
+```
+                    ACTION
+                       │
+                       ▼
+               ┌──────────────┐
+               │ Cache lookup │
+               └──────┬───────┘
+                      │
+                success?
+                 /       \
+               yes        no
+                │          │
+                ▼          ▼
+             execute      DOM
+                           │
+                       success?
+                        /     \
+                      yes      no
+                       │        │
+                       ▼        ▼
+                    execute   Fast LLM
+                                 │
+                              success?
+                              /     \
+                            yes      no
+                             │        │
+                             ▼        ▼
+                          execute   Vision
+                                      │
+                                   success?
+                                   /     \
+                                 yes      no
+                                  │        │
+                                  ▼        ▼
+                               execute   Human
+```
+
+---
+
+ # 20\. Router Policy
+
+ The router must optimize for:
+
+ 1. reliability
+2. latency
+3. cost
+
+ Default ordering:
+
+```
+cached deterministic
+>
+direct DOM
+>
+Playwright/CDP
+>
+small model
+>
+vision
+>
+human
+```
+
+ The exact policy may evolve based on benchmarks.
+
+---
+
+ # 21\. Action Cache
+
+ Location:
+
+```
+memory/
+cache/
+```
+
+ The cache stores successful execution strategies.
+
+ Example:
+
+```
+{
+  "site": "linkedin.com",
+  "intent": "open search",
+  "strategy": {
+    "method": "aria",
+    "role": "textbox",
+    "name": "Search"
+  }
+}
+```
+
+---
+
+ # 22\. Trajectory Cache
+
+ A trajectory represents a successful sequence.
+
+ Example:
+
+```
+{
+  "intent": "search LinkedIn",
+  "steps": [
+    {
+      "action": "click",
+      "target": "Search"
+    },
+    {
+      "action": "fill",
+      "target": "Search",
+      "valueSource": "user"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    }
+  ]
+}
+```
+
+ Sensitive user data must NOT be persisted unless explicitly authorized.
+
+---
+
+ # 23\. Cache Validation
+
+ Every cached action must be validated before execution.
+
+ Validation:
+
+```
+element exists
+element visible
+element enabled
+semantic identity matches
+page context matches
+```
+
+ If validation fails:
+
+```
+cache miss
+ ↓
+DOM discovery
+ ↓
+AI fallback
+ ↓
+update cache
+```
+
+ Never blindly execute stale selectors.
+
+---
+
+ # 24\. AI Runtime
+
+ Location:
+
+```
+ai/
+```
+
+ The AI layer must be provider-agnostic.
+
+ Interfaces:
+
+```
+interface ModelProvider {
+  complete(request: ModelRequest): Promise<ModelResponse>;
+}
+
+interface VisionProvider {
+  analyze(request: VisionRequest): Promise<VisionResponse>;
+}
+```
+
+---
+
+ # 25\. Model Routing
+
+ Models are divided by capability.
+
+```
+Planner
+Fast Reasoner
+Extractor
+Vision
+```
+
+ Example:
+
+```
+models:
+  planner: capable-model
+  fast: low-latency-model
+  extraction: small-model
+  vision: vision-model
+```
+
+ No provider should be hardcoded into the core.
+
+---
+
+ # 26\. Fast Model
+
+ The fast model is primarily used for:
+
+ - element selection
+- small decisions
+- DOM interpretation
+- recovery
+- action validation
+
+ It should receive minimal context.
+
+---
+
+ # 27\. Planner Model
+
+ The planner handles:
+
+ - complex tasks
+- multi-step reasoning
+- ambiguous instructions
+- workflow decomposition
+
+ The planner should not execute every individual click.
+
+---
+
+ # 28\. Vision Layer
+
+ Location:
+
+```
+ai/vision/
+```
+
+ Vision is a fallback.
+
+ Use it for:
+
+ - canvas
+- inaccessible controls
+- visual-only interfaces
+- difficult rendering
+- DOM failure
+
+ Vision should not become the default interaction mechanism.
+
+---
+
+ # 29\. Human-in-the-Loop
+
+ Human takeover is a supported execution state.
+
+```
+AGENT
+  ↓
+security challenge
+  ↓
+PAUSED
+  ↓
+USER ACTION
+  ↓
+RESUME
+```
+
+ Typical cases:
+
+ - MFA
+- CAPTCHA
+- passkey
+- biometric confirmation
+- security approval
+- irreversible action confirmation
+
+ Browser-OS must not attempt to bypass security mechanisms.
+
+---
+
+ # 30\. Session Architecture
+
+ Persistent browser state:
+
+```
+Browser
+│
+├── Profile
+│   ├── Cookies
+│   ├── LocalStorage
+│   ├── SessionStorage
+│   ├── Extensions
+│   └── Preferences
+│
+└── Sessions
+    ├── Page
+    ├── Page
+    └── Page
+```
+
+ The session manager should know:
+
+```
+profile
+browser
+tabs
+pages
+frames
+authentication state
+```
+
+---
+
+ # 31\. Extension Architecture
+
+ A browser extension may be used as a bridge between:
+
+```
+Browser-OS daemon
+        │
+        ▼
+WebSocket / local IPC
+        │
+        ▼
+Browser extension
+        │
+        ▼
+Chrome APIs / CDP
+```
+
+ The extension should remain small.
+
+ Do not move agent reasoning into the extension.
+
+ The extension is primarily an integration/control surface.
+
+---
+
+ # 32\. Daemon
+
+ Browser-OS should have a local daemon.
+
+ Example:
+
+```
+browser-os daemon
+```
+
+ Responsibilities:
+
+ - browser lifecycle
+- session registry
+- CDP connections
+- WebSocket API
+- action execution
+- telemetry
+- security boundary
+
+ Architecture:
+
+```
+CLI / SDK / Agent
+       │
+       ▼
+ Browser-OS Daemon
+       │
+       ├── Browser Manager
+       ├── Session Manager
+       ├── Action Router
+       ├── Memory
+       └── Telemetry
+       │
+       ▼
+    Chrome/Edge
+```
+
+---
+
+ # 33\. IPC
+
+ Initial recommendation:
+
+```
+Local WebSocket
+```
+
+ Potential future:
+
+ - Unix domain sockets
+- named pipes
+- gRPC
+- remote WebSocket
+
+ The protocol must be versioned.
+
+ Example:
+
+```
+{
+  "version": "1",
+  "requestId": "req_123",
+  "method": "browser.action",
+  "params": {}
+}
+```
+
+---
+
+ # 34\. Browser-OS API
+
+ External agents should interact with Browser-OS through a stable API.
+
+ Example:
+
+```
+interface BrowserOS {
+  sessions(): SessionManager;
+
+  browser(): BrowserManager;
+
+  tasks(): TaskManager;
+
+  actions(): ActionManager;
+
+  memory(): MemoryManager;
+}
+```
+
+---
+
+ # 35\. Security Architecture
+
+ Sensitive information should remain outside model context wherever possible.
+
+ Never expose unnecessarily:
+
+ - cookies
+- session tokens
+- passwords
+- API keys
+- OAuth tokens
+- browser profile secrets
+
+ The browser should perform authenticated actions directly.
+
+ The model should receive:
+
+```
+"Click the authenticated user's Settings button"
+```
+
+ not:
+
+```
+"Here is the user's session cookie..."
+```
+
+---
+
+ # 36. Permission System
+
+ Actions should have risk classifications.
+
+```
+LOW
+MEDIUM
+HIGH
+```
+
+ Examples:
+
+ ### LOW
+
+ - search
+- navigate
+- read
+- extract
+
+ ### MEDIUM
+
+ - send message
+- upload file
+- modify record
+
+ ### HIGH
+
+ - delete
+- financial transaction
+- account permission changes
+- irreversible operations
+
+ Policies should allow:
+
+```
+permissions:
+  low: auto
+  medium: auto
+  high: confirm
+```
+
+---
+
+ # 37\. Observability
+
+ Every operation should emit structured events.
+
+ Example:
+
+```
+{
+  "taskId": "task_123",
+  "sessionId": "session_456",
+  "action": "click",
+  "method": "cache",
+  "latencyMs": 8,
+  "llmCalls": 0,
+  "success": true
+}
+```
+
+ Track:
+
+ - action latency
+- DOM extraction latency
+- model latency
+- token usage
+- browser latency
+- retries
+- failures
+- cache hit rate
+- vision usage
+
+---
+
+ # 38\. Performance Architecture
+
+ Performance optimization priorities:
+
+```
+1. avoid unnecessary work
+2. avoid unnecessary model calls
+3. avoid unnecessary DOM processing
+4. avoid screenshots
+5. reuse browser sessions
+6. reuse learned trajectories
+7. minimize IPC overhead
+8. minimize serialization
+9. use CDP for hot paths
+10. parallelize independent operations
+```
+
+---
+
+ # 39\. Performance Targets
+
+ These are engineering targets, not guaranteed benchmark results.
+
+ ### Cached action
+
+ Target:
+
+```
+<20ms agent-side overhead
+```
+
+ ### Deterministic action
+
+ Target:
+
+```
+<100ms agent-side overhead
+```
+
+ ### DOM reasoning
+
+ Target:
+
+```
+<1 second
+```
+
+ ### Browser startup
+
+ Prefer:
+
+```
+warm session
+```
+
+ over:
+
+```
+cold browser startup
+```
+
+ All targets must be measured with reproducible benchmarks.
+
+---
+
+ # 40\. Parallelism
+
+ Independent browser operations may execute concurrently when safe.
+
+ Example:
+
+```
+Tab A → extraction
+Tab B → extraction
+Tab C → extraction
+```
+
+ But actions affecting the same page must preserve ordering.
+
+ The scheduler should distinguish:
+
+```
+read-only
+```
+
+ from:
+
+```
+mutating
+```
+
+ operations.
+
+---
+
+ # 41\. Failure Recovery
+
+ Every action should have a recovery strategy.
+
+ Example:
+
+```
+cached selector
+       ↓
+failed
+       ↓
+semantic DOM
+       ↓
+failed
+       ↓
+fast model
+       ↓
+failed
+       ↓
+vision
+       ↓
+failed
+       ↓
+human
+```
+
+ Retries must be bounded.
+
+ Never endlessly repeat failed actions.
+
+---
+
+ # 42\. State Machine
+
+ Task state:
+
+```
+CREATED
+  ↓
+PLANNING
+  ↓
+EXECUTING
+  ↓
+OBSERVING
+  ↓
+EXECUTING
+  ↓
+COMPLETED
+```
+
+ Alternative states:
+
+```
+FAILED
+PAUSED
+WAITING_FOR_HUMAN
+CANCELLED
+```
+
+---
+
+ # 43\. Data Storage
+
+ MVP:
+
+```
+SQLite
+```
+
+ Use SQLite for:
+
+ - sessions metadata
+- cache
+- trajectories
+- telemetry metadata
+- task history
+
+ Do not introduce a distributed database during MVP.
+
+---
+
+ # 44\. Memory Types
+
+ Separate memory into:
+
+ ### Ephemeral memory
+
+ Current task.
+
+ ### Session memory
+
+ Current browser session.
+
+ ### Workflow memory
+
+ Known successful workflows.
+
+ ### Site memory
+
+ Site-specific strategies.
+
+ ### Global memory
+
+ Reusable generic patterns.
+
+---
+
+ # 45\. Repository Architecture
+
+ Recommended repository:
+
+```
+browser-os/
+│
+├── apps/
+│   └── cli/
+│
+├── packages/
+│   ├── core/
+│   ├── browser/
+│   ├── cdp/
+│   ├── playwright/
+│   ├── actions/
+│   ├── dom/
+│   ├── ai/
+│   ├── memory/
+│   ├── security/
+│   ├── telemetry/
+│   ├── protocol/
+│   └── sdk/
+│
+├── extension/
+│
+├── daemon/
+│
+├── benchmarks/
+│
+├── tests/
+│
+├── docs/
+│
+├── examples/
+│
+└── package.json
+```
+
+---
+
+ # 46\. Dependency Strategy
+
+ Use mature OSS instead of rebuilding infrastructure.
+
+ ## Use
+
+ ### Chromium
+
+ Browser engine.
+
+ ### Playwright
+
+ High-level browser automation.
+
+ ### CDP
+
+ Low-level browser protocol.
+
+ ### SQLite
+
+ Local persistence.
+
+ ### OpenTelemetry
+
+ Observability.
+
+ ### WebSocket
+
+ Initial local communication protocol.
+
+---
+
+ # 47\. Optional Integrations
+
+ These are not mandatory core dependencies.
+
+ ### Stagehand
+
+ Potential AI action/observation integration.
+
+ ### Browser Use
+
+ Research/reference/optional agent backend.
+
+ ### Steel
+
+ Reference for browser/session infrastructure.
+
+ ### Lightpanda
+
+ Optional browser provider for workloads where compatibility is sufficient.
+
+ ### Local models
+
+ Ollama/vLLM/llama.cpp-compatible providers.
+
+---
+
+ # 48\. What Browser-OS Owns
+
+ Browser-OS should own:
+
+```
+Task orchestration
+Action routing
+Memory
+Trajectory learning
+Browser sessions
+Policy
+Security
+Performance strategy
+Observability
+Provider abstraction
+```
+
+---
+
+ # 49\. What Browser-OS Does NOT Own
+
+ Do not rebuild:
+
+```
+Chromium
+Playwright
+LLMs
+Vision models
+CDP
+SQLite
+```
+
+ Use them.
+
+---
+
+ # 50\. Relationship to Existing Projects
+
+ Browser-OS is inspired by several categories of systems.
+
+```
+BrowserSkill
+    → real browser + extension + CDP + session concepts
+
+Playwright
+    → reliable deterministic browser automation
+
+Stagehand
+    → AI + browser primitives + caching concepts
+
+Steel
+    → browser/session infrastructure
+
+Browser Use
+    → autonomous browser-agent concepts
+
+Lightpanda
+    → optional lightweight browser execution
+```
+
+ Browser-OS is not intended to be a direct clone of any one project.
+
+ The unique combination is:
+
+```
+real browser
++
+persistent session
++
+deterministic execution
++
+adaptive AI routing
++
+trajectory memory
++
+DOM compression
++
+vision fallback
++
+human takeover
+```
+
+---
+
+ # 51\. Core Differentiator
+
+ The central optimization loop is:
+
+```
+             FIRST EXECUTION
+
+User
+ ↓
+AI reasoning
+ ↓
+DOM
+ ↓
+Action
+ ↓
+Success
+ ↓
+Learn
+ ↓
+Cache
+
+             FUTURE EXECUTION
+
+User
+ ↓
+Cache
+ ↓
+Direct action
+ ↓
+Success
+```
+
+ The system should become cheaper and faster through repetition.
+
+---
+
+ # 52\. Browser-OS Kernel Concept
+
+ The lowest-level Browser-OS runtime can be considered the "kernel":
+
+```
+Browser Kernel
+├── Session Manager
+├── CDP Manager
+├── Page Manager
+├── Action Executor
+├── Permission Manager
+└── Event Bus
+```
+
+ Above it:
+
+```
+AI Runtime
+├── Router
+├── Planner
+├── Model Providers
+├── Vision
+└── Memory
+```
+
+ Above that:
+
+```
+Applications / Agents
+├── Research Agent
+├── CRM Agent
+├── Social Agent
+├── Coding Agent
+└── Custom Agent
+```
+
+ This is the intended long-term architecture.
+
+---
+
+ # 53\. Application Model
+
+ Eventually agents can become applications running on Browser-OS.
+
+ Example:
+
+```
+browser-os app install linkedin-researcher
+browser-os app install crm-agent
+browser-os app install web-researcher
+```
+
+ Applications should consume Browser-OS APIs instead of controlling Chrome directly.
+
+---
+
+ # 54\. Multi-Agent Future
+
+ Browser-OS should eventually support:
+
+```
+Agent A
+   │
+   ├── Browser Session A
+   │
+Agent B
+   │
+   ├── Browser Session B
+   │
+Agent C
+   │
+   └── Browser Session C
+```
+
+ Sessions must remain isolated.
+
+---
+
+ # 55\. Remote Mode
+
+ MVP is local-first.
+
+ Future architecture:
+
+```
+Local Agent
+     │
+     ▼
+Browser-OS Client
+     │
+     ▼
+Remote Browser-OS
+     │
+     ▼
+Chrome Fleet
+```
+
+ This allows cloud browser infrastructure later without changing the agent API.
+
+---
+
+ # 56\. Benchmark Architecture
+
+ Benchmarks must measure the entire execution pipeline.
+
+ Example:
+
+```
+Task start
+ ↓
+planning
+ ↓
+DOM observation
+ ↓
+model
+ ↓
+action
+ ↓
+browser
+ ↓
+result
+```
+
+ Measure each component separately.
+
+ Metrics:
+
+```
+E2E latency
+Browser latency
+Router latency
+DOM latency
+Model latency
+Action latency
+Tokens
+LLM calls
+Vision calls
+Cache hit rate
+Success rate
+RAM
+CPU
+```
+
+---
+
+ # 57\. Benchmark Baselines
+
+ Browser-OS should be compared against:
+
+```
+Raw Playwright
+Raw CDP
+BrowserSkill
+Browser Use
+Stagehand
+Optional Lightpanda
+```
+
+ Same:
+
+ - machine
+- network
+- browser
+- model
+- task
+- starting state
+
+ No benchmark result should be presented as universal.
+
+---
+
+ # 58\. MVP Milestones
+
+ ## Milestone 1
+
+```
+Chrome
+ ↓
+CDP
+ ↓
+Browser Manager
+ ↓
+Navigate
+```
+
+---
+
+ ## Milestone 2
+
+```
+Chrome
+ ↓
+Playwright/CDP
+ ↓
+DOM extraction
+ ↓
+click/type
+```
+
+---
+
+ ## Milestone 3
+
+```
+DOM
+ ↓
+semantic elements
+ ↓
+fast model
+ ↓
+action
+```
+
+---
+
+ ## Milestone 4
+
+```
+action
+ ↓
+trajectory recording
+ ↓
+cache
+```
+
+---
+
+ ## Milestone 5
+
+```
+cache
+ ↓
+DOM
+ ↓
+LLM
+ ↓
+vision
+```
+
+ Complete adaptive router.
+
+---
+
+ ## Milestone 6
+
+ Test:
+
+```
+LinkedIn
+Microsoft Entra
+Google Workspace
+complex SPA
+multi-tab
+MFA pause/resume
+```
+
+---
+
+ # 59\. First End-to-End Vertical Slice
+
+ The first complete implementation should be:
+
+```
+1. Start Chrome with persistent profile
+2. Attach via CDP
+3. Detect active page
+4. Navigate
+5. Extract interactive DOM
+6. Resolve an element
+7. Click/type
+8. Observe result
+9. Record successful trajectory
+10. Repeat same task
+11. Execute from cache
+12. Compare latency
+```
+
+ This vertical slice must exist before implementing advanced agent features.
+
+---
+
+ # 60\. Example
+
+ Input:
+
+```
+Open LinkedIn and search for John Smith.
+```
+
+ First execution:
+
+```
+Task
+ ↓
+Router
+ ↓
+Cache miss
+ ↓
+DOM observation
+ ↓
+Fast model
+ ↓
+Click search
+ ↓
+Type query
+ ↓
+Submit
+ ↓
+Observe
+ ↓
+Record trajectory
+```
+
+ Second execution:
+
+```
+Task
+ ↓
+Router
+ ↓
+Cache hit
+ ↓
+Validate elements
+ ↓
+CDP/Playwright
+ ↓
+Done
+```
+
+---
+
+ # 61\. Engineering Rules for AI Coding Agents
+
+ Any AI coding agent working on Browser-OS must follow these rules.
+
+ ## Rule 1
+
+ Read this document before modifying the architecture.
+
+ ## Rule 2
+
+ Inspect existing code before writing new code.
+
+ ## Rule 3
+
+ Search existing OSS before implementing infrastructure.
+
+ ## Rule 4
+
+ Do not add dependencies without justification.
+
+ ## Rule 5
+
+ Do not introduce an LLM call into a deterministic path.
+
+ ## Rule 6
+
+ Do not introduce screenshots when structured DOM/CDP data is sufficient.
+
+ ## Rule 7
+
+ Do not expose secrets to models unnecessarily.
+
+ ## Rule 8
+
+ Do not bypass CAPTCHA, MFA, passkeys, or security controls.
+
+ ## Rule 9
+
+ Benchmark performance-sensitive changes.
+
+ ## Rule 10
+
+ Add tests with every major implementation.
+
+ ## Rule 11
+
+ Keep provider implementations behind interfaces.
+
+ ## Rule 12
+
+ Prefer small incremental commits.
+
+---
+
+ # 62\. Implementation Order
+
+ Recommended order:
+
+```
+Phase 1
+Browser Manager
+        ↓
+Phase 2
+CDP + Playwright
+        ↓
+Phase 3
+Action Executor
+        ↓
+Phase 4
+DOM Intelligence
+        ↓
+Phase 5
+Router
+        ↓
+Phase 6
+Memory / Cache
+        ↓
+Phase 7
+AI providers
+        ↓
+Phase 8
+Vision fallback
+        ↓
+Phase 9
+Security / permissions
+        ↓
+Phase 10
+Benchmarks
+        ↓
+Phase 11
+Enterprise compatibility
+```
+
+ Do not reverse this order by starting with a sophisticated autonomous LLM agent.
+
+---
+
+ # 63\. Definition of Architectural Success
+
+ The architecture is successful if:
+
+ 1. A real Chrome/Edge session can be attached.
+2. Existing authentication state remains usable.
+3. Common browser actions work without AI.
+4. DOM can be compressed into useful semantic context.
+5. AI is only used when deterministic execution fails.
+6. Successful workflows can be cached.
+7. Repeated workflows become measurably faster.
+8. Vision is optional rather than mandatory.
+9. Security-sensitive actions can pause for human interaction.
+10. Components can be replaced independently.
+11. Performance can be measured at every layer.
+12. The system can support both simple websites and complex enterprise applications.
+
+---
+
+ # 64\. Final Architecture Principle
+
+ Browser-OS is fundamentally an **execution optimization system**.
+
+ The objective is not:
+
+```
+"How can we make the LLM smarter?"
+```
+
+ The objective is:
+
+```
+"How can we make the LLM unnecessary for as much of the browser task as possible?"
+```
+
+ The ideal execution path is:
+
+```
+User intent
+    ↓
+Learned strategy
+    ↓
+Deterministic action
+    ↓
+Browser
+```
+
+ AI should appear only where uncertainty exists.
+
+ The long-term goal is therefore:
+
+```
+FIRST RUN
+
+AI-heavy
+████████████████████
+
+AFTER LEARNING
+
+AI-light
+████░░░░░░░░░░░░░░
+
+MATURE WORKFLOW
+
+Mostly deterministic
+█░░░░░░░░░░░░░░░░░
+```
+
+ This is the core idea of Browser-OS:
+
+ > **Maximum browser capability with minimum AI overhead.**

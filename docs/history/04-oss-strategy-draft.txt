@@ -1,0 +1,563 @@
+Belum. **ARCHITECTURE.md tadi cukup untuk menjelaskan arsitektur, tetapi belum cukup sebagai blueprint implementasi OSS.** Yang kurang memang _dependency/lineage strategy_: mana yang **fork**, mana yang **vendored**, mana yang **dependency**, mana yang **adapter**, dan mana yang **100% kita bangun sendiri**.
+
+ Saya justru menyarankan kita menambahkan dokumen terpisah:
+
+ > `OSS_STRATEGY.md` — **Source / Fork / Build / Enhance Map**
+
+ Supaya AI harness tidak salah kaprah dan misalnya malah menggabungkan 5 framework menjadi monster dependency.
+
+ ## Model yang saya sarankan
+
+```
+                    BROWSER-OS
+                         │
+        ┌────────────────┼─────────────────┐
+        │                │                 │
+        ▼                ▼                 ▼
+     REUSE             ADAPT             BUILD
+        │                │                 │
+        ▼                ▼                 ▼
+   Chromium          BrowserSkill       Action Router
+   Playwright        concepts/code      Trajectory Memory
+   CDP                Stagehand         DOM Intelligence
+   SQLite             concepts          Execution Policy
+   OpenTelemetry      Steel concepts    Browser-OS API
+```
+
+ ### 1\. **KEEP / USE AS DEPENDENCY**
+
+ Ini jangan difork kecuali ada alasan ekstrem.
+
+ | Komponen | Strategi | Alasan |
+| --- | --- | --- |
+| Chromium | **Use** | Browser engine terlalu besar untuk difork |
+| Chrome / Edge | **Use** | Compatibility dengan web nyata |
+| CDP | **Use** | Protocol standar |
+| Playwright | **Dependency** | Mature browser automation |
+| SQLite | **Dependency** | Local persistence |
+| OpenTelemetry | **Dependency** | Observability |
+| WebSocket | **Dependency** | IPC MVP |
+
+Jadi:
+
+```
+Browser-OS
+ ├── Chromium
+ ├── Playwright
+ ├── CDP
+ ├── SQLite
+ └── OpenTelemetry
+```
+
+ **Tidak perlu fork.**
+
+---
+
+ # 2\. BROWSER SKILL — STUDY / SELECTIVE ADAPTATION
+
+ Ini yang paling dekat dengan kebutuhan kita.
+
+ Tapi saya **tidak otomatis menyarankan fork seluruh BrowserSkill**.
+
+ Strateginya:
+
+```
+BrowserSkill
+     │
+     ├── architecture → ADOPT
+     ├── extension → STUDY / POSSIBLY ADAPT
+     ├── CDP connection → REUSE CONCEPT
+     ├── daemon → REFERENCE
+     ├── session isolation → ADOPT
+     └── agent layer → DO NOT COPY
+```
+
+ Kenapa?
+
+ Karena kita ingin Browser-OS punya core abstraction sendiri.
+
+ Kalau kita fork BrowserSkill terlalu awal:
+
+```
+BrowserSkill
+     ↓
+Browser-OS
+     ↓
+patch
+     ↓
+patch
+     ↓
+patch
+     ↓
+upstream divergence
+```
+
+ lama-lama kita punya masalah maintenance.
+
+ **Jadi default: `REFERENCE + SELECTIVE PORT`, bukan full fork.**
+
+---
+
+ # 3\. STAGEHAND — REUSE CONCEPTS, NOT CORE
+
+ Stagehand sangat relevan untuk:
+
+```
+act()
+observe()
+extract()
+```
+
+ dan konsep AI-assisted browser automation.
+
+ Tapi Browser-OS tidak perlu menjadi Stagehand wrapper.
+
+ Kita ambil:
+
+```
+Stagehand
+ ├── action abstraction → INSPIRE
+ ├── observe abstraction → INSPIRE
+ ├── caching → STUDY
+ └── self-healing → STUDY
+```
+
+ Lalu implementasi Browser-OS:
+
+```
+Browser-OS
+ ├── Action API
+ ├── Observation API
+ ├── Router
+ └── Trajectory Engine
+```
+
+ Dengan begitu kita punya **control penuh terhadap hot path**.
+
+---
+
+ # 4\. STEEL — REFERENCE BROWSER INFRASTRUCTURE
+
+ Steel lebih berguna sebagai referensi:
+
+```
+Steel
+ ├── browser lifecycle
+ ├── sessions
+ ├── CDP
+ ├── persistence
+ └── browser infrastructure
+```
+
+ Kita:
+
+```
+ADOPT CONCEPTS
+       ↓
+IMPLEMENT OWN ABSTRACTION
+```
+
+ Bukan:
+
+```
+Steel
+ ↓
+fork
+ ↓
+massive modifications
+```
+
+---
+
+ # 5\. BROWSER USE — AGENT REFERENCE
+
+ Browser Use berada lebih tinggi.
+
+ Kita tidak ingin Browser-OS menjadi fork Browser Use.
+
+ Gunakan untuk memahami:
+
+```
+agent ↔ browser
+task decomposition
+DOM observation
+browser state
+```
+
+ Tetapi:
+
+```
+Browser Use
+     │
+     └── REFERENCE ONLY
+```
+
+ Untuk MVP bahkan **tidak perlu dependency**.
+
+---
+
+ # 6\. YANG BENAR-BENAR KITA BUILD
+
+ Ini bagian paling penting.
+
+ ## A. Browser-OS Action Router
+
+ **100% custom.**
+
+```
+              ACTION
+                 │
+                 ▼
+              CACHE?
+             /      \
+           yes       no
+            │         │
+            ▼         ▼
+         EXECUTE     DOM
+                       │
+                    success?
+                    /      \
+                  yes       no
+                   │         │
+                   ▼         ▼
+                EXECUTE   FAST LLM
+                              │
+                           success?
+                           /      \
+                         yes       no
+                          │         │
+                          ▼         ▼
+                       EXECUTE    VISION
+```
+
+ Ini salah satu **core IP** kita.
+
+---
+
+ # 7\. DOM Intelligence — BUILD + ENHANCE
+
+ Jangan mengandalkan raw Playwright locator atau raw HTML.
+
+ Kita bikin:
+
+```
+packages/dom/
+```
+
+ dengan:
+
+```
+DOM Parser
+Semantic Extractor
+Interactive Element Detector
+Visibility Detector
+Context Compressor
+Element Resolver
+```
+
+ Contoh:
+
+```
+2 MB HTML
+     ↓
+DOM
+     ↓
+interactive nodes
+     ↓
+semantic representation
+     ↓
+relevant nodes
+     ↓
+5-20 KB context
+```
+
+ Ini salah satu area yang sangat penting untuk performance.
+
+---
+
+ # 8\. TRAJECTORY MEMORY — BUILD OUR OWN
+
+ Ini **jangan bergantung pada framework lain**.
+
+```
+Task
+ ↓
+Actions
+ ↓
+Result
+ ↓
+Trajectory
+ ↓
+Store
+```
+
+ Contoh:
+
+```
+{
+  "intent": "open LinkedIn search",
+  "site": "linkedin.com",
+  "steps": [
+    "find search",
+    "click search",
+    "fill query",
+    "press enter"
+  ]
+}
+```
+
+ Run kedua:
+
+```
+intent
+ ↓
+trajectory lookup
+ ↓
+validate
+ ↓
+execute
+```
+
+ Ini yang membuat Browser-OS semakin cepat seiring pemakaian.
+
+---
+
+ # 9\. EXECUTION POLICY — BUILD OUR OWN
+
+ Ini bahkan lebih fundamental daripada model.
+
+ Browser-OS harus memutuskan:
+
+```
+Can I do this deterministically?
+       │
+       ├── YES → no LLM
+       │
+       └── NO
+            ↓
+       Can DOM solve it?
+            │
+            ├── YES → DOM
+            │
+            └── NO
+                 ↓
+              small LLM
+                 │
+                 └── vision
+```
+
+ Jadi kita punya:
+
+```
+ExecutionPolicy
+ActionRouter
+FallbackPolicy
+RetryPolicy
+RecoveryPolicy
+```
+
+---
+
+ # 10\. BROWSER SESSION — BUILD OUR OWN ABSTRACTION
+
+ Kita tetap menggunakan Chrome/Chromium/Edge.
+
+ Tapi abstraction-nya milik Browser-OS:
+
+```
+interface BrowserSession {
+  id: string;
+  profileId: string;
+  browser: BrowserProvider;
+  pages: Page[];
+  status: SessionStatus;
+}
+```
+
+ Sehingga nanti:
+
+```
+Chrome
+Chromium
+Edge
+Lightpanda
+Remote Browser
+```
+
+ bisa menjadi provider.
+
+---
+
+ # 11. PLAYWRIGHT — ENHANCE VIA ADAPTER
+
+ Ini penting.
+
+ Jangan fork Playwright.
+
+ Kita buat:
+
+```
+Browser-OS
+     │
+     ▼
+PlaywrightAdapter
+     │
+     ▼
+Playwright
+```
+
+ dan:
+
+```
+Browser-OS
+     │
+     ▼
+CDPAdapter
+     │
+     ▼
+CDP
+```
+
+ Router bisa memilih:
+
+```
+CDP
+vs
+Playwright
+```
+
+ berdasarkan action.
+
+---
+
+ # 12\. Jadi klasifikasi finalnya
+
+ Saya akan memasukkan tabel ini ke repo:
+
+ | Project / Technology | Strategy | Status |
+| --- | --- | --- |
+| Chromium | **USE** | Core runtime |
+| Chrome | **USE** | Primary real browser |
+| Edge | **USE** | Compatibility |
+| CDP | **USE** | Low-level protocol |
+| Playwright | **USE** | Automation dependency |
+| SQLite | **USE** | Local memory |
+| OpenTelemetry | **USE** | Observability |
+| BrowserSkill | **REFERENCE + SELECTIVE PORT** | Architecture/reference |
+| Stagehand | **REFERENCE + CONCEPT ADOPTION** | AI/browser patterns |
+| Steel | **REFERENCE** | Browser infrastructure |
+| Browser Use | **REFERENCE** | Agent patterns |
+| Lightpanda | **FUTURE OPTIONAL PROVIDER** | Alternative runtime |
+| DOM engine | **BUILD** | Browser-OS core |
+| Semantic DOM | **BUILD** | Browser-OS core |
+| DOM compression | **BUILD** | Performance core |
+| Action Router | **BUILD** | Browser-OS core |
+| Execution Policy | **BUILD** | Browser-OS core |
+| Trajectory Memory | **BUILD** | Browser-OS core |
+| Action Cache | **BUILD** | Browser-OS core |
+| Recovery Engine | **BUILD** | Browser-OS core |
+| Session abstraction | **BUILD** | Browser-OS API |
+| Permission system | **BUILD** | Security core |
+| Browser-OS protocol | **BUILD** | Public API |
+| Browser-OS SDK | **BUILD** | Developer API |
+| Benchmark suite | **BUILD** | Performance validation |
+
+---
+
+ # Dan ada satu keputusan yang saya ubah dari dokumen sebelumnya
+
+ **Jangan fork apa pun pada hari pertama.**
+
+ Saya akan mulai:
+
+```
+browser-os/
+│
+├── dependencies
+│   ├── playwright
+│   ├── chromium
+│   └── ...
+│
+├── adapters
+│   ├── playwright
+│   └── cdp
+│
+├── core
+│   ├── router
+│   ├── policy
+│   └── execution
+│
+├── intelligence
+│   ├── dom
+│   ├── semantic
+│   └── compression
+│
+├── memory
+│   ├── cache
+│   └── trajectory
+│
+└── browser
+    ├── session
+    └── profile
+```
+
+ Kemudian baru setelah profiling:
+
+```
+"Bagian X dari dependency Y adalah bottleneck."
+```
+
+ baru kita pertimbangkan:
+
+```
+fork
+vendor
+replace
+rewrite
+```
+
+ **Bukan sebaliknya.**
+
+---
+
+ ## Kenapa strategi ini paling aman?
+
+ Karena tujuan Browser-OS bukan memenangkan lomba **"siapa punya kode paling banyak"**.
+
+ Tujuannya:
+
+```
+                  Browser-OS
+                      │
+        ┌─────────────┴─────────────┐
+        │                           │
+   Existing OSS               Our innovation
+        │                           │
+        ▼                           ▼
+   Browser engine             Action Router
+   CDP                         DOM Intelligence
+   Playwright                  Trajectory Memory
+   SQLite                      Execution Policy
+   Telemetry                   Performance Engine
+```
+
+ Dengan demikian kita bisa mengambil **10 tahun engineering dari OSS**, tetapi hanya menulis sendiri bagian yang memang menjadi pembeda.
+
+ ### Jadi dokumen repo saya sarankan akhirnya menjadi:
+
+```
+docs/
+├── PRD.md
+├── ARCHITECTURE.md
+├── OSS_STRATEGY.md       ← yang kurang tadi
+├── PERFORMANCE.md
+├── SECURITY.md
+├── BENCHMARKS.md
+└── ROADMAP.md
+```
+
+ Dan `OSS_STRATEGY.md` harus punya satu aturan keras untuk AI harness:
+
+ > **Do not fork, vendor, replace, or substantially modify an existing OSS dependency unless the task explicitly identifies a measured limitation, licensing requirement, security requirement, or performance bottleneck.**
+
+ Itu akan mencegah AI agent kita melakukan hal yang sangat sering terjadi: **melihat 4 project open-source lalu menggabungkan semuanya menjadi 500 dependency tanpa alasan arsitektural.**

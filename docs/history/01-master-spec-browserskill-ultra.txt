@@ -1,0 +1,2306 @@
+Bisa. Yang kamu butuhkan sebenarnya bukan cuma PRD, tetapi **Project Constitution / Master Specification**: satu dokumen yang menjelaskan _visi, problem, arsitektur, scope, MVP, non-goals, benchmark, prinsip engineering, roadmap, dan acceptance criteria_ sehingga nanti bisa diberikan ke Google/Claude/Codex/Gemini/agent harness dan mereka langsung memahami proyek tanpa percakapan panjang.
+
+ Di bawah ini saya buat versi yang sengaja **implementation-ready**. Saya akan menyebut proyek ini sementara **BrowserSkill Ultra**; nama bisa diganti nanti.
+
+ # BrowserSkill Ultra
+
+ ## 0\. Project Identity
+
+ **Working name:** BrowserSkill Ultra\
+ **Type:** Open-source, local-first, high-performance AI browser automation platform\
+ **Primary goal:** Build a browser agent that combines the compatibility and authenticated-session capabilities of a real Chrome/Edge browser with an aggressively optimized AI/action layer.
+
+ ### One-sentence definition
+
+ > BrowserSkill Ultra is a local-first browser agent that controls real Chrome/Chromium/Edge sessions through CDP, uses deterministic automation whenever possible, invokes AI only when necessary, preserves real authenticated browser state, and dynamically escalates from cached actions → DOM → lightweight reasoning → vision/computer-use.
+
+ ### Core philosophy
+
+ **Do not use AI when code can do the job.\
+ Do not use vision when DOM can do the job.\
+ Do not use a large model when a small model can do the job.\
+ Do not launch a new browser when an existing session can be reused.\
+ Do not throw away knowledge that was already learned.**
+
+ The system should become faster and cheaper as it learns repeated workflows.
+
+---
+
+ # 1\. Problem
+
+ Current browser agents typically have one or more of these problems:
+
+ 1. They use an LLM for almost every browser action.
+2. They repeatedly inspect screenshots.
+3. They discard knowledge between runs.
+4. They create new browser sessions unnecessarily.
+5. They have difficulty preserving real-world authentication state.
+6. They are expensive for long workflows.
+7. They are slow on modern SPA applications.
+8. They struggle with enterprise applications, SSO, MFA, extensions, complex DOMs, iframes, shadow DOM, and dynamic interfaces.
+9. Browser automation tools are often optimized either for deterministic automation OR autonomous AI agents, rather than combining both.
+10. Benchmark performance often focuses on browser startup/rendering rather than total agent latency.
+
+ The project aims to solve this by separating:
+
+ - browser execution
+- action selection
+- reasoning
+- memory
+- authentication/session management
+- visual fallback
+
+---
+
+ # 2\. Target User
+
+ Primary users:
+
+ - developers building browser agents
+- AI automation developers
+- enterprise automation teams
+- researchers experimenting with browser agents
+- power users automating repetitive web workflows
+- self-hosted AI-agent users
+
+ The first version is **developer-first**, not a consumer product.
+
+---
+
+ # 3\. Target Websites
+
+ The system should target real-world modern websites, including:
+
+ ### Consumer/social
+
+ - LinkedIn
+- Instagram
+- X
+- Facebook
+- Reddit
+- YouTube
+
+ ### Productivity
+
+ - Google Workspace
+- Microsoft 365
+- Notion
+- Slack
+- Jira
+- GitHub
+
+ ### Enterprise
+
+ - Microsoft Entra / Azure-hosted applications
+- Okta-authenticated applications
+- Salesforce
+- ServiceNow
+- internal corporate applications
+- SSO applications
+
+ ### Requirements
+
+ The system should support websites with:
+
+ - JavaScript-heavy SPAs
+- dynamic DOM
+- iframes
+- shadow DOM
+- lazy loading
+- infinite scrolling
+- popups
+- multiple tabs
+- downloads
+- uploads
+- authentication
+- SSO
+- MFA/passkey flows where the user can complete them
+- browser extensions
+- persistent cookies
+- localStorage/sessionStorage
+- complex navigation
+
+---
+
+ # 4\. What We Are Building
+
+ The system consists of six major layers.
+
+```
+                    USER / AGENT
+                         │
+                         ▼
+                ┌─────────────────┐
+                │   Task Router   │
+                └────────┬────────┘
+                         │
+             ┌───────────┼───────────┐
+             ▼           ▼           ▼
+          CACHE         DOM        VISION
+             │           │           │
+             ▼           ▼           ▼
+        Direct/CDP   Small LLM   Computer Use
+             │           │           │
+             └───────────┼───────────┘
+                         ▼
+                  Action Executor
+                         │
+                         ▼
+                   Playwright/CDP
+                         │
+                         ▼
+                Real Chrome/Edge
+                         │
+                         ▼
+                     Website
+```
+
+---
+
+ # 5\. Architectural Principle
+
+ ## 5.1 Execution hierarchy
+
+ Every action should follow this priority:
+
+```
+1. Cached action
+2. Deterministic Playwright/CDP
+3. DOM semantic reasoning
+4. Lightweight LLM
+5. Vision/computer-use model
+6. Human takeover
+```
+
+ The system must never jump directly to an expensive AI operation if a cheaper reliable method is available.
+
+---
+
+ # 6\. Browser Layer
+
+ ## Primary browser
+
+ Use real Chromium-based browsers:
+
+ - Chrome
+- Chromium
+- Edge
+
+ The browser must remain a first-class citizen.
+
+ Do not make a lightweight browser engine the default for complex websites.
+
+ Lightweight engines such as Lightpanda may become an optional optimization for compatible workloads, but they are NOT the primary browser for the MVP.
+
+ ## Why
+
+ Real browser compatibility matters more than synthetic browser benchmarks for:
+
+ - enterprise SSO
+- authentication
+- extensions
+- WebAuthn
+- passkeys
+- cookies
+- browser policies
+- complex JavaScript
+- modern SPAs
+- anti-bot mechanisms
+- real user sessions
+
+---
+
+ # 7\. Browser Session Model
+
+ The browser should support persistent sessions.
+
+ Instead of:
+
+```
+launch browser
+→ login
+→ task
+→ close
+```
+
+ the system should support:
+
+```
+Browser Manager
+    ├── Profile A
+    ├── Profile B
+    ├── Profile C
+    └── Profile N
+```
+
+ Each profile can contain:
+
+ - cookies
+- localStorage
+- sessionStorage
+- extensions
+- browser settings
+- authentication state
+
+ The system must be able to reconnect to an existing browser session through CDP.
+
+---
+
+ # 8\. Browser Manager
+
+ Responsibilities:
+
+ - launch browser
+- attach to existing browser
+- create profiles
+- reuse profiles
+- maintain browser lifecycle
+- discover tabs/pages
+- manage CDP connections
+- detect browser crashes
+- reconnect
+- optionally maintain warm browser sessions
+
+ ### Desired API
+
+```
+browser = BrowserManager()
+
+session = await browser.attach(profile="default")
+
+page = await session.get_active_page()
+
+await page.navigate(url)
+```
+
+ The exact API is implementation-dependent.
+
+---
+
+ # 9\. Action Engine
+
+ The action engine is the most performance-critical component.
+
+ Supported primitives:
+
+ - navigate
+- click
+- type
+- fill
+- press key
+- scroll
+- hover
+- select
+- drag
+- upload
+- download
+- wait
+- extract
+- screenshot
+- switch tab
+- open tab
+- close tab
+- focus frame
+
+ Every action should produce structured telemetry:
+
+```
+{
+  "action": "click",
+  "target": "Search",
+  "method": "dom",
+  "latency_ms": 24,
+  "success": true
+}
+```
+
+---
+
+ # 10\. CDP
+
+ CDP is the low-level browser communication layer.
+
+ Use CDP where direct browser protocol access provides lower overhead than higher-level abstractions.
+
+ Possible operations:
+
+ - DOM
+- Runtime
+- Input
+- Page
+- Network
+- Browser
+- Target
+- Storage
+
+ Playwright remains useful for high-level reliable browser automation.
+
+ The system should not artificially choose between Playwright and CDP.
+
+ Instead:
+
+```
+High-level stable operation
+        ↓
+Playwright
+
+Low-level performance-critical operation
+        ↓
+CDP
+```
+
+---
+
+ # 11\. DOM Observation Engine
+
+ The agent should NOT send the entire DOM to the LLM.
+
+ Instead:
+
+```
+Raw DOM
+   ↓
+Parser
+   ↓
+Interactive element extraction
+   ↓
+Semantic compression
+   ↓
+Relevant subset
+   ↓
+LLM
+```
+
+ Example:
+
+```
+{
+  "buttons": [
+    {
+      "id": 12,
+      "role": "button",
+      "name": "Search"
+    }
+  ],
+  "inputs": [
+    {
+      "id": 22,
+      "placeholder": "Search"
+    }
+  ]
+}
+```
+
+ The goal is to reduce:
+
+ - tokens
+- latency
+- model cost
+- hallucination
+- context size
+
+---
+
+ # 12\. Semantic Element Model
+
+ Every interactive element should receive a stable internal ID.
+
+ Example:
+
+```
+{
+  "element_id": "e_382",
+  "tag": "button",
+  "role": "button",
+  "text": "Search",
+  "aria_label": "Search",
+  "visible": true,
+  "enabled": true,
+  "bbox": {
+    "x": 120,
+    "y": 80,
+    "width": 90,
+    "height": 32
+  }
+}
+```
+
+ The agent reasons over these IDs rather than raw coordinates whenever possible.
+
+---
+
+ # 13\. Action Cache
+
+ This is one of the most important differentiators.
+
+ If the system successfully performs:
+
+```
+LinkedIn
+→ Search
+→ enter query
+→ click result
+```
+
+ store the successful trajectory.
+
+ Example:
+
+```
+{
+  "site": "linkedin.com",
+  "workflow_hash": "...",
+  "steps": [
+    {
+      "intent": "open search",
+      "strategy": "aria",
+      "selector": "..."
+    }
+  ]
+}
+```
+
+ Next execution:
+
+```
+same intent
+     ↓
+trajectory cache
+     ↓
+execute
+```
+
+ No LLM required unless the cached strategy fails.
+
+---
+
+ # 14\. Cache Invalidation
+
+ Never blindly trust cached selectors.
+
+ Validate:
+
+ - element exists
+- element is visible
+- element is enabled
+- semantic attributes remain compatible
+
+ If validation fails:
+
+```
+cache
+ ↓
+fail
+ ↓
+DOM discovery
+ ↓
+LLM
+ ↓
+new strategy
+ ↓
+update cache
+```
+
+ The system should learn from website changes.
+
+---
+
+ # 15\. AI Router
+
+ The AI router determines how much intelligence is required.
+
+ Example:
+
+```
+Can cached action execute?
+    YES → execute
+
+NO
+
+Can DOM semantics resolve target?
+    YES → execute
+
+NO
+
+Can small model resolve target?
+    YES → execute
+
+NO
+
+Use vision/computer-use
+
+NO
+
+Human takeover
+```
+
+ This router is central to performance.
+
+---
+
+ # 16\. Model Strategy
+
+ The architecture must be model-agnostic.
+
+ Support:
+
+ - OpenAI-compatible APIs
+- Anthropic-compatible APIs
+- Gemini
+- local models
+- Ollama
+- vLLM
+- llama.cpp
+- other OpenAI-compatible endpoints
+
+ The user should be able to configure:
+
+```
+models:
+  planner: ...
+  fast_reasoner: ...
+  vision: ...
+```
+
+---
+
+ # 17\. Model Routing
+
+ Use different models for different tasks.
+
+ Example:
+
+```
+Task planning
+→ capable model
+
+DOM element selection
+→ small fast model
+
+Extraction
+→ small/medium model
+
+Complex reasoning
+→ capable model
+
+Visual interaction
+→ vision model
+```
+
+ Do not use the strongest model for everything.
+
+---
+
+ # 18\. Stagehand Integration
+
+ Stagehand may be integrated as an optional AI execution layer.
+
+ Potential responsibilities:
+
+ - observe
+- act
+- extract
+
+ But Stagehand should NOT own the complete agent loop.
+
+ BrowserSkill Ultra owns:
+
+ - task routing
+- session
+- memory
+- caching
+- browser lifecycle
+- performance policy
+
+ Stagehand is an interchangeable component.
+
+---
+
+ # 19\. Browser Use Integration
+
+ Browser Use may be used as:
+
+ - reference implementation
+- optional agent backend
+- source of optimization ideas
+- benchmark target
+
+ Do not tightly couple the core architecture to Browser Use.
+
+---
+
+ # 20\. Steel-style Infrastructure
+
+ Borrow concepts from Steel Browser where useful:
+
+ - browser session management
+- browser lifecycle
+- persistent sessions
+- cookies/localStorage
+- proxy support
+- extension management
+- remote browser infrastructure
+
+ However, MVP should remain local-first.
+
+---
+
+ # 21\. Vision Fallback
+
+ Vision is explicitly a fallback mechanism.
+
+ Use it when:
+
+ - DOM is insufficient
+- canvas UI
+- visual controls
+- unusual rendering
+- inaccessible elements
+- complex shadow DOM
+- coordinate-based interaction
+
+ Flow:
+
+```
+DOM failed
+    ↓
+screenshot
+    ↓
+vision model
+    ↓
+coordinates / semantic target
+    ↓
+CDP input
+```
+
+---
+
+ # 22\. Human Takeover
+
+ Some tasks legitimately require humans.
+
+ Examples:
+
+ - CAPTCHA
+- MFA approval
+- security confirmation
+- biometric/passkey prompt
+- suspicious-login confirmation
+- irreversible action confirmation
+
+ The system should pause rather than attempt to bypass security mechanisms.
+
+ Example:
+
+```
+Agent
+ ↓
+MFA detected
+ ↓
+pause
+ ↓
+user completes MFA
+ ↓
+agent resumes
+```
+
+---
+
+ # 23\. Security Model
+
+ Security is a first-class requirement.
+
+ Never expose:
+
+ - cookies
+- session tokens
+- passwords
+- OAuth secrets
+- API keys
+
+ to an LLM unless explicitly required and intentionally configured.
+
+ The agent should preferably operate through browser primitives rather than extracting credentials.
+
+ Sensitive browser data should remain local.
+
+---
+
+ # 24\. Permissions
+
+ Actions should have risk levels.
+
+ ### Low risk
+
+ - navigation
+- search
+- reading
+- extraction
+
+ ### Medium risk
+
+ - sending messages
+- modifying records
+- uploading files
+
+ ### High risk
+
+ - deleting data
+- financial actions
+- account changes
+- permission changes
+- irreversible operations
+
+ High-risk actions should support explicit confirmation policies.
+
+---
+
+ # 25\. Observability
+
+ Every action should be traceable.
+
+ Telemetry:
+
+```
+task_id
+session_id
+page_id
+action
+method
+model
+tokens
+latency
+success
+failure
+retry_count
+```
+
+ Example:
+
+```
+{
+  "action": "click",
+  "method": "cache",
+  "latency_ms": 4,
+  "model_tokens": 0,
+  "success": true
+}
+```
+
+ This allows us to answer:
+
+ > Why was this task slow?
+
+---
+
+ # 26\. Performance Goals
+
+ Performance is a first-class product feature.
+
+ ## Target
+
+ ### Deterministic action
+
+ Target:
+
+ **\<100 ms median action overhead**
+
+ Ideal:
+
+ **\<50 ms**
+
+---
+
+ ### Cached action
+
+ Target:
+
+ **\<20 ms agent-side overhead**
+
+ excluding network/site latency.
+
+---
+
+ ### DOM reasoning
+
+ Target:
+
+ **\<1 second**
+
+ for a simple element-resolution task.
+
+---
+
+ ### Vision fallback
+
+ Target:
+
+ **only when required**
+
+ and measure separately.
+
+---
+
+ ### Browser startup
+
+ Prefer:
+
+```
+warm browser
+```
+
+ over repeatedly launching Chromium.
+
+---
+
+ # 27\. Cost Goals
+
+ The system should minimize model calls.
+
+ Ideal task:
+
+```
+10 browser actions
+0–1 LLM calls
+```
+
+ rather than:
+
+```
+10 browser actions
+10+ LLM calls
+```
+
+ Long-term target:
+
+ > Repeated workflows should approach deterministic automation cost.
+
+---
+
+ # 28\. Primary Benchmark
+
+ Create a benchmark suite consisting of real-world workflows.
+
+ ### Category A — simple
+
+ - Google search
+- website navigation
+- form fill
+- extraction
+
+ ### Category B — SPA
+
+ - LinkedIn search
+- GitHub navigation
+- Slack search
+- Notion
+
+ ### Category C — enterprise
+
+ - Microsoft Entra login flow
+- Microsoft 365
+- Salesforce
+- internal SPA
+
+ ### Category D — difficult UI
+
+ - iframe
+- shadow DOM
+- dynamic content
+- infinite scroll
+- popup
+- multi-tab
+
+ ### Category E — authentication
+
+ - existing authenticated session
+- expired session
+- MFA pause/resume
+- SSO redirect
+
+---
+
+ # 29\. Benchmark Metrics
+
+ Measure:
+
+ ### Speed
+
+ - end-to-end latency
+- browser action latency
+- observation latency
+- LLM latency
+- screenshot latency
+
+ ### Cost
+
+ - input tokens
+- output tokens
+- model calls
+- estimated cost
+
+ ### Reliability
+
+ - task success rate
+- action success rate
+- recovery rate
+
+ ### Resource usage
+
+ - RAM
+- CPU
+- browser processes
+- network traffic
+
+ ### Intelligence efficiency
+
+ - LLM calls/task
+- vision calls/task
+- tokens/task
+
+---
+
+ # 30\. Benchmark Comparisons
+
+ Compare against:
+
+ - BrowserSkill
+- Browser Use
+- Stagehand
+- Playwright
+- raw CDP
+- optional Lightpanda
+- optional Skyvern
+
+ The benchmark must use the same:
+
+ - machine
+- browser version
+- network conditions
+- model
+- task
+- starting browser state
+
+ Do not claim "fastest" without controlled benchmarks.
+
+---
+
+ # 31\. MVP
+
+ MVP should NOT attempt to implement every feature.
+
+ ## MVP objective
+
+ Prove this architecture:
+
+ > Real Chrome/Edge + persistent profile + CDP + Playwright + DOM extraction + action router + action cache + LLM fallback.
+
+ ### MVP components
+
+ 1. Browser Manager
+2. CDP connection
+3. Playwright adapter
+4. DOM extractor
+5. semantic element representation
+6. action executor
+7. action cache
+8. simple AI router
+9. model abstraction
+10. human takeover
+11. telemetry
+12. CLI
+
+---
+
+ # 32\. MVP User Experience
+
+ Example:
+
+```
+browser-ultra start
+```
+
+ Then:
+
+```
+browser-ultra attach
+```
+
+ Then:
+
+```
+> Open LinkedIn and search for John Smith
+```
+
+ Agent:
+
+```
+[session] attached to Chrome
+[cache] miss
+[dom] resolving search input
+[action] type
+[action] press Enter
+[dom] resolving result
+[action] click
+[done] 3.8s
+```
+
+ Second execution:
+
+```
+[session] reused
+[cache] hit
+[action] type
+[action] click
+[done] 1.2s
+```
+
+ The second execution should require substantially less reasoning.
+
+---
+
+ # 33\. CLI
+
+ Proposed:
+
+```
+browser-ultra start
+browser-ultra attach
+browser-ultra profiles
+browser-ultra sessions
+browser-ultra run "..."
+browser-ultra inspect
+browser-ultra benchmark
+browser-ultra trace
+```
+
+---
+
+ # 34\. Python API
+
+ Potential API:
+
+```
+from browser_ultra import Agent
+
+agent = Agent(
+    profile="default",
+    model="fast-model"
+)
+
+result = await agent.run(
+    "Open LinkedIn and search for John Smith"
+)
+
+print(result)
+```
+
+---
+
+ # 35\. Configuration
+
+ Example:
+
+```
+browser:
+  engine: chromium
+  headless: false
+  persistent: true
+  profile: default
+
+execution:
+  prefer_cache: true
+  prefer_dom: true
+  prefer_cdp: true
+  use_vision_fallback: true
+
+models:
+  planner: ...
+  fast: ...
+  vision: ...
+
+security:
+  confirm_high_risk_actions: true
+
+telemetry:
+  enabled: true
+```
+
+---
+
+ # 36\. Repository Structure
+
+ Proposed:
+
+```
+browser-ultra/
+│
+├── apps/
+│   └── cli/
+│
+├── core/
+│   ├── agent/
+│   ├── router/
+│   ├── planner/
+│   ├── memory/
+│   └── policy/
+│
+├── browser/
+│   ├── manager/
+│   ├── cdp/
+│   ├── playwright/
+│   ├── profiles/
+│   └── sessions/
+│
+├── actions/
+│   ├── click/
+│   ├── type/
+│   ├── scroll/
+│   ├── navigate/
+│   └── extract/
+│
+├── dom/
+│   ├── parser/
+│   ├── semantic/
+│   └── compressor/
+│
+├── ai/
+│   ├── providers/
+│   ├── router/
+│   ├── fast/
+│   └── vision/
+│
+├── cache/
+│   ├── trajectories/
+│   ├── selectors/
+│   └── embeddings/
+│
+├── telemetry/
+│
+├── security/
+│
+├── benchmarks/
+│
+├── tests/
+│
+└── docs/
+```
+
+---
+
+ # 37\. Technology Selection
+
+ Default preference:
+
+ ### Browser
+
+ Chromium / Chrome / Edge
+
+ ### Browser protocol
+
+ CDP
+
+ ### Automation
+
+ Playwright
+
+ ### AI browser primitives
+
+ Stagehand-compatible architecture
+
+ ### Agent
+
+ Custom lightweight orchestration layer
+
+ ### Model interface
+
+ OpenAI-compatible abstraction
+
+ ### Storage
+
+ SQLite for MVP
+
+ ### Cache
+
+ SQLite + in-memory cache
+
+ ### Language
+
+ TypeScript or Python
+
+ Preferred initial implementation:
+
+ **TypeScript**
+
+ Reason:
+
+ - excellent Playwright ecosystem
+- native browser tooling
+- strong async model
+- good CLI ecosystem
+- easy integration with CDP
+
+ Python can be supported later.
+
+---
+
+ # 38\. Design Rule: Everything Is Replaceable
+
+ No vendor-specific component should become the architecture.
+
+ Interfaces should exist for:
+
+```
+BrowserProvider
+ModelProvider
+ActionExecutor
+VisionProvider
+MemoryProvider
+CacheProvider
+SessionProvider
+```
+
+ This allows replacing:
+
+ - Chrome
+- Playwright
+- Stagehand
+- model provider
+- storage
+
+ without rewriting the system.
+
+---
+
+ # 39\. Failure Recovery
+
+ The agent should recover automatically.
+
+ Example:
+
+```
+cached selector
+     ↓
+failed
+     ↓
+re-query DOM
+     ↓
+failed
+     ↓
+small model
+     ↓
+failed
+     ↓
+vision
+     ↓
+failed
+     ↓
+human
+```
+
+ Never blindly repeat the same failed action.
+
+---
+
+ # 40\. Learning Loop
+
+ Successful recovery should update the system.
+
+```
+Task
+ ↓
+Action
+ ↓
+Success
+ ↓
+Record strategy
+ ↓
+Cache
+ ↓
+Next task
+ ↓
+Faster
+```
+
+ Failed strategies should also be recorded:
+
+```
+selector failed
+ ↓
+mark invalid
+ ↓
+discover replacement
+```
+
+---
+
+ # 41\. Long-Term Goal
+
+ The long-term goal is not merely:
+
+ > "another browser agent."
+
+ The goal is:
+
+ > **A browser execution runtime where AI reasoning is progressively removed from repeated work.**
+
+ The first time:
+
+```
+AI-heavy
+```
+
+ After learning:
+
+```
+AI-light
+```
+
+ After repeated execution:
+
+```
+almost deterministic
+```
+
+ This creates a system that becomes:
+
+ - faster
+- cheaper
+- more predictable
+- more reliable
+
+ over time.
+
+---
+
+ # 42\. Non-Goals
+
+ MVP does NOT aim to:
+
+ - build a new browser engine
+- replace Chrome
+- bypass CAPTCHA
+- bypass MFA
+- defeat anti-bot/security systems
+- scrape sites in violation of their policies
+- create credential-stealing functionality
+- autonomously perform unrestricted financial transactions
+- implement every browser automation framework
+- optimize benchmark numbers at the expense of compatibility
+
+---
+
+ # 43\. Security and Compliance Boundary
+
+ The system must respect:
+
+ - website terms where applicable
+- user authorization
+- authentication boundaries
+- security controls
+- privacy requirements
+
+ It must not attempt to bypass security mechanisms.
+
+ Human interaction is the correct fallback for security challenges.
+
+---
+
+ # 44\. Development Phases
+
+ ## Phase 0 — Research
+
+ Tasks:
+
+ - inspect BrowserSkill architecture
+- inspect Browser Use
+- inspect Stagehand
+- inspect Steel
+- inspect Playwright
+- inspect relevant CDP APIs
+- identify reusable OSS components
+- identify license compatibility
+
+ Deliverable:
+
+ `ARCHITECTURE_RESEARCH.md`
+
+---
+
+ ## Phase 1 — Browser Runtime
+
+ Build:
+
+ - Browser Manager
+- persistent profiles
+- CDP connection
+- Playwright adapter
+- page discovery
+- reconnect logic
+
+ Success criteria:
+
+ > Can attach to a real existing Chrome session and control it reliably.
+
+---
+
+ ## Phase 2 — Deterministic Action Engine
+
+ Build:
+
+ - click
+- type
+- navigate
+- scroll
+- select
+- tab management
+- extraction
+
+ Success criteria:
+
+ > Common workflows execute without LLM.
+
+---
+
+ ## Phase 3 — DOM Intelligence
+
+ Build:
+
+ - DOM parser
+- interactive element extraction
+- semantic compression
+- element IDs
+
+ Success criteria:
+
+ > The agent can resolve common UI targets from DOM data without screenshots.
+
+---
+
+ ## Phase 4 — AI Router
+
+ Build:
+
+ - cache lookup
+- DOM resolution
+- small model fallback
+- vision fallback
+
+ Success criteria:
+
+ > AI is invoked only when cheaper methods fail.
+
+---
+
+ ## Phase 5 — Memory
+
+ Build:
+
+ - trajectory cache
+- selector cache
+- failure memory
+- site-specific strategies
+
+ Success criteria:
+
+ > Repeated workflows become measurably faster.
+
+---
+
+ ## Phase 6 — Enterprise Compatibility
+
+ Test:
+
+ - Microsoft Entra
+- Google SSO
+- LinkedIn
+- Instagram
+- Slack
+- Salesforce
+- complex SPAs
+
+ Success criteria:
+
+ > Persistent authenticated sessions remain usable.
+
+---
+
+ ## Phase 7 — Benchmarking
+
+ Build automated benchmark suite.
+
+ Compare:
+
+ - BrowserSkill
+- Browser Use
+- Stagehand
+- raw Playwright
+- Browser Ultra
+
+ Success criteria:
+
+ > Every performance claim is reproducible.
+
+---
+
+ # 45\. MVP Acceptance Criteria
+
+ The MVP is considered successful when:
+
+ ### Browser
+
+ - can attach to an existing Chrome/Chromium session
+- can preserve authenticated profile
+- can handle multiple tabs
+- can recover from browser disconnect
+
+ ### Automation
+
+ - common DOM actions work reliably
+- actions are executable without LLM
+
+ ### AI
+
+ - model can select elements from compressed DOM
+- model is not called for deterministic actions
+- vision is optional fallback
+
+ ### Memory
+
+ - successful workflows can be cached
+- cached workflows execute without unnecessary LLM calls
+- invalid cache entries can recover
+
+ ### Performance
+
+ - deterministic action overhead target \<100 ms
+- cached action overhead target \<20 ms
+- no unnecessary screenshot generation
+- no unnecessary LLM calls
+
+ ### Compatibility
+
+ Demonstrate successful workflows on at least:
+
+ - LinkedIn
+- Microsoft Entra
+- one complex SPA
+- one SSO application
+- one multi-tab workflow
+
+---
+
+ # 46\. Definition of Done
+
+ A feature is not complete merely because it works once.
+
+ It must have:
+
+ 1. implementation
+2. unit tests
+3. integration tests
+4. failure handling
+5. telemetry
+6. benchmark measurement
+7. documentation
+8. security review
+9. reproducible test case your existing browser. It understands the task, uses the browser you are already logged into, handles complex modern
+
+---
+
+ # 47\. AI Harness Instructions
+
+ When an AI coding agent receives this document, it must:
+
+ 1. Read the entire specification.
+2. Inspect the repository before modifying code.
+3. Search for existing OSS implementations before reinventing components.
+4. Prefer mature OSS libraries.
+5. Verify licenses.
+6. Implement interfaces before concrete integrations where practical.
+7. Keep components replaceable.
+8. Write tests for every major component.
+9. Add benchmarks for performance-sensitive code.
+10. Never optimize based solely on assumptions.
+11. Measure before and after optimization.
+12. Never introduce an LLM call when deterministic logic is sufficient.
+13. Never introduce screenshots when DOM/CDP is sufficient.
+14. Never launch a new browser if an existing session can be reused.
+15. Preserve browser authentication state.
+16. Keep secrets and session credentials out of model context.
+17. Ask for human interaction for CAPTCHA/MFA/security prompts.
+18. Document architectural decisions.
+
+---
+
+ # 48\. AI Harness Working Mode
+
+ The coding agent should work in this order:
+
+```
+Understand
+   ↓
+Inspect repository
+   ↓
+Research existing OSS
+   ↓
+Design
+   ↓
+Implement smallest vertical slice
+   ↓
+Test
+   ↓
+Benchmark
+   ↓
+Profile
+   ↓
+Optimize
+   ↓
+Document
+```
+
+ Do not implement the entire system in one speculative pass.
+
+---
+
+ # 49\. First Vertical Slice
+
+ The very first end-to-end milestone should be:
+
+```
+Existing Chrome
+     ↓
+attach via CDP
+     ↓
+identify active page
+     ↓
+navigate
+     ↓
+extract interactive DOM
+     ↓
+resolve target
+     ↓
+click/type
+     ↓
+observe result
+     ↓
+record trajectory
+     ↓
+repeat same task
+     ↓
+execute from cache
+```
+
+ This is the foundational proof of the architecture.
+
+---
+
+ # 50\. First Demo
+
+ Demo:
+
+ > User has an already-authenticated Chrome profile.
+
+ User says:
+
+```
+Open LinkedIn and search for "John Smith".
+```
+
+ First run:
+
+```
+attach
+→ inspect DOM
+→ resolve search
+→ type
+→ submit
+→ resolve result
+→ click
+→ record
+```
+
+ Second run:
+
+```
+attach
+→ trajectory cache
+→ execute
+→ done
+```
+
+ Show telemetry:
+
+```
+First run:
+LLM calls: 1
+Vision calls: 0
+Cached actions: 0
+Latency: X
+
+Second run:
+LLM calls: 0
+Vision calls: 0
+Cached actions: N
+Latency: Y
+```
+
+ The improvement between run #1 and run #2 is a core product demonstration.
+
+---
+
+ # 51\. Ultimate Vision
+
+ The final system should feel like:
+
+ > "Tell the agent what you want done in your existing browser. It understands the task, uses the browser you are already logged into, handles complex modern websites, asks for help only when necessary, remembers how it solved previous tasks, and gets faster over time."
+
+ Not:
+
+ > "A giant LLM repeatedly looks at screenshots and clicks things."
+
+ The fundamental engineering objective is:
+
+ # Maximum browser capability with minimum AI overhead.
+
+---
+
+ # 52\. Success Equation
+
+ The project optimizes:
+
+```
+Performance
+    =
+Browser efficiency
+×
+Action efficiency
+×
+Reasoning efficiency
+×
+Memory reuse
+```
+
+ and minimizes:
+
+```
+Cost
+=
+LLM calls
++
+tokens
++
+vision calls
++
+browser startup
++
+unnecessary observation
+```
+
+ while maximizing:
+
+```
+Reliability
+=
+DOM
++
+CDP
++
+persistent sessions
++
+recovery
++
+AI fallback
++
+human takeover
+```
+
+---
+
+ # 53\. Final Product Principle
+
+ The system should always ask:
+
+ > "Can I do this without AI?"
+
+ If yes:
+
+ **do it deterministically.**
+
+ If not:
+
+ > "Can I solve it from DOM?"
+
+ If yes:
+
+ **use DOM.**
+
+ If not:
+
+ > "Can a small model solve it?"
+
+ If yes:
+
+ **use small model.**
+
+ If not:
+
+ > "Do I really need vision?"
+
+ If yes:
+
+ **use vision.**
+
+ If security or ambiguity requires a human:
+
+ **pause and ask the human.**
+
+ This hierarchy is the central idea of BrowserSkill Ultra.
+
+Iya — kalau kriterianya **harus bisa menangani website berat/modern seperti LinkedIn, Instagram, Microsoft Entra, SSO, MFA, SPA, iframe, extension, dan login session asli**, saya justru **tidak akan mengganti BrowserSkill dengan Lightpanda**. BrowserSkill punya keunggulan arsitektural yang penting: dia mengendalikan **Chrome/Edge yang benar-benar dipakai user**, termasuk login state yang sudah ada, dan punya human-in-the-loop untuk CAPTCHA/login/confirmation.  GitHub+1
+
+ Tapi kita bisa bikin **racikan OSS yang jauh lebih agresif soal performance**.
+
+ ## Racikan yang saya pilih
+
+```
+                    USER
+                     │
+                     ▼
+              ┌──────────────┐
+              │ Fast Router  │
+              │  ~1-5 ms     │
+              └──────┬───────┘
+                     │
+       ┌─────────────┼──────────────┐
+       │             │              │
+       ▼             ▼              ▼
+   DOM action     CDP action     Vision/LLM
+   deterministic  deterministic   fallback
+       │             │              │
+       └─────────────┼──────────────┘
+                     ▼
+             ┌───────────────┐
+             │ Chromium      │
+             │ real profile  │
+             │ + extensions  │
+             └───────┬───────┘
+                     │
+                     ▼
+               Internet
+```
+
+ Dan saya akan memakai:
+
+ - **Chromium/Chrome/Edge asli** sebagai engine utama.
+- **CDP** sebagai transport/action layer.
+- **Playwright** untuk deterministic actions.
+- **Stagehand** hanya sebagai AI primitive (`observe`, `act`, `extract`), bukan sebagai agent loop utama. Stagehand memang dirancang sebagai layer AI di atas Playwright.  GitHub
+- **BrowserSkill-style extension/session bridge** untuk mempertahankan login/session/user profile.
+- **LLM router kecil** untuk menentukan kapan AI benar-benar diperlukan.
+- **Vision/Computer Use** hanya sebagai _last resort_.
+
+ Hasilnya kira-kira:
+
+```
+Known action
+     ↓
+Playwright/CDP
+     ↓
+~milliseconds
+```
+
+ bukan:
+
+```
+Known action
+     ↓
+LLM
+ ↓
+screenshot
+ ↓
+LLM
+ ↓
+click
+```
+
+ Itu perbedaan besar.
+
+---
+
+ # Kenapa saya tidak menjadikan Browser Use sebagai core?
+
+ **Browser Use** memang sangat menarik dan sekarang punya beberapa komponen OSS termasuk Browser Harness dan agent implementations. Repository utamanya juga sangat aktif.  GitHub+1
+
+ Tapi kebutuhanmu agak berbeda.
+
+ Browser Use lebih cocok:
+
+ > "Ini task saya. Tolong selesaikan."
+
+ Sedangkan BrowserSkill lebih dekat:
+
+ > "Ini browser saya. Silakan pakai browser ini."
+
+ Untuk **LinkedIn / Instagram / Entra / corporate SSO**, model kedua sangat menarik karena state browser adalah aset.
+
+ BrowserSkill secara eksplisit mendukung existing login state dan browser session, termasuk Chrome dan Edge.  GitHub
+
+---
+
+ # Bagian paling penting: jangan pakai AI untuk setiap klik
+
+ Ini menurut saya kunci untuk membuatnya **gila cepat**.
+
+ Misalnya user:
+
+ > "Buka LinkedIn, cari John Smith, lalu buka profile-nya."
+
+ Agent pertama kali mungkin harus reasoning.
+
+```
+LLM
+ ↓
+"LinkedIn search box"
+ ↓
+observe
+ ↓
+click
+```
+
+ Tapi setelah tahu struktur:
+
+```
+linkedin.com
+    ↓
+search input
+    ↓
+CSS/ARIA selector
+    ↓
+click
+```
+
+ kita **cache trajectory**.
+
+ Jadi task kedua:
+
+```
+user
+ ↓
+router
+ ↓
+cached action
+ ↓
+CDP
+ ↓
+DONE
+```
+
+ Tanpa LLM.
+
+ Stagehand sendiri punya konsep preview/cache untuk action yang berulang, jadi ide ini memang sejalan dengan arsitektur tooling modern.  GitHub
+
+---
+
+ # Saya bahkan akan bikin 4 tingkat intelligence
+
+ ### Level 0 — direct CDP
+
+ Untuk action yang sudah diketahui.
+
+```
+click
+type
+scroll
+select
+navigate
+wait
+```
+
+ **Tidak ada LLM.**
+
+---
+
+ ### Level 1 — DOM semantic
+
+ Kalau selector berubah:
+
+```
+"button dengan label Search"
+```
+
+ Cari berdasarkan:
+
+```
+ARIA
+role
+text
+label
+DOM structure
+```
+
+ Masih tidak perlu vision model.
+
+---
+
+ ### Level 2 — lightweight AI
+
+ Kalau halaman berubah:
+
+```
+DOM snapshot
+     ↓
+small LLM
+     ↓
+"click element #382"
+```
+
+ Yang dikirim ke model **bukan screenshot 2 MB**, tetapi DOM yang sudah dipangkas.
+
+ Misalnya:
+
+```
+{
+  "buttons": [
+    {"id": 12, "text": "Search"},
+    {"id": 13, "text": "Messages"}
+  ],
+  "inputs": [
+    {"id": 22, "placeholder": "Search"}
+  ]
+}
+```
+
+ Jauh lebih murah dan cepat.
+
+---
+
+ ### Level 3 — Computer Vision
+
+ Baru kalau:
+
+ - canvas
+- weird custom UI
+- shadow DOM
+- visual-only control
+- coordinate-based interaction
+- website yang DOM-nya kacau
+
+ baru:
+
+```
+screenshot
+ ↓
+vision model
+ ↓
+coordinates
+ ↓
+CDP mouse
+```
+
+ Ini **fallback**, bukan default.
+
+ Stagehand sekarang juga mendukung computer-use model dari berbagai provider, tetapi saya akan menaruhnya di level terakhir karena latency/cost-nya lebih besar.  GitHub+1
+
+---
+
+ # Dan untuk Entra, saya tetap pakai Chrome/Edge asli
+
+ Ini penting.
+
+ Untuk:
+
+ - Microsoft Entra
+- Google Workspace
+- Okta
+- LinkedIn
+- Instagram
+- Slack
+- Salesforce
+- internal enterprise apps
+
+ saya **tidak mau browser engine alternatif menjadi default**.
+
+ Saya ingin:
+
+```
+Chrome / Edge
+├── existing cookies
+├── localStorage
+├── session
+├── extensions
+├── WebAuthn
+├── passkeys
+├── MFA
+├── SSO
+└── enterprise policies
+```
+
+ Karena itulah BrowserSkill sangat menarik untuk use case ini. BrowserSkill memang menghubungkan agent ke Chrome/Edge yang sudah login, dan ketika bertemu CAPTCHA/login/confirmation, bisa meminta human takeover lalu melanjutkan.  GitHub
+
+ **Ini jauh lebih valuable daripada sekadar benchmark browser 10× lebih cepat.**
+
+---
+
+ # Ada satu OSS lain yang saya akan curi idenya: Steel
+
+ **Steel Browser** menarik untuk bagian infrastructure.
+
+ Ia menggunakan Chrome \+ CDP dan menyediakan session management, cookies/local storage, extension support, proxy management, dan resource lifecycle. Lisensinya Apache 2.0.  GitHub+1
+
+ Jadi kalau nanti kamu ingin:
+
+```
+                    Agent
+                      │
+              ┌───────┴───────┐
+              │ Browser Pool  │
+              └───────┬───────┘
+                      │
+       ┌──────────────┼──────────────┐
+       ▼              ▼              ▼
+   Chrome #1      Chrome #2      Chrome #3
+   profile A      profile B      profile C
+```
+
+ Steel-style architecture sangat berguna.
+
+---
+
+ # Jadi stack "monster" yang saya bayangkan
+
+```
+┌─────────────────────────────────────────────┐
+│                 AI AGENT                    │
+│                                             │
+│     Planner / Task Understanding            │
+└──────────────────────┬──────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────┐
+│              ACTION ROUTER                  │
+│                                             │
+│  cached → DOM → CDP → small LLM → vision   │
+└───────────────┬─────────────────────────────┘
+                │
+        ┌───────┼─────────┐
+        │       │         │
+        ▼       ▼         ▼
+     Cache   Playwright  Stagehand
+        │       │         │
+        └───────┼─────────┘
+                ▼
+          Chrome CDP
+                │
+        ┌───────┴────────┐
+        │                │
+    Extension        Real Profile
+        │                │
+        └───────┬────────┘
+                ▼
+       LinkedIn / Entra / IG
+```
+
+ ### Dan browser-nya tetap hidup.
+
+ Jangan:
+
+```
+task
+ ↓
+launch Chrome
+ ↓
+login
+ ↓
+task
+ ↓
+kill Chrome
+```
+
+ Tetapi:
+
+```
+Chrome process
+      │
+      ├── profile A
+      │
+      ├── profile B
+      │
+      └── profile C
+             │
+        persistent
+        sessions
+```
+
+ Ini bisa menghemat latency yang sangat besar.
+
+---
+
+ # Yang menarik: Browser Use sendiri sekarang punya "ultrafast"
+
+ Ada satu repository mereka yang **secara eksplisit bernama `jev-ultrafast`**, dengan deskripsi "Fastest and cheapest web agent". Jadi ini juga layak dibedah kalau targetmu benar-benar mengejar performance.  GitHub
+
+ Saya tidak akan langsung percaya klaim "fastest" tersebut tanpa benchmark yang sama terhadap BrowserSkill, tetapi **secara engineering ini justru kandidat yang layak kita bongkar**.
+
+---
+
+ ## Kalau targetmu benar-benar "BrowserSkill tetapi monster"
+
+ Saya akan membuatnya bukan fork BrowserSkill mentah.
+
+ Saya akan mengambil:
+
+ **BrowserSkill**\
+ → real logged-in Chrome/Edge + extension/session architecture
+
+ **Playwright**\
+ → deterministic execution
+
+ **CDP**\
+ → low-overhead browser control
+
+ **Stagehand**\
+ → `observe / act / extract` ketika DOM tidak cukup
+
+ **Steel**\
+ → session/browser lifecycle ideas
+
+ **Browser Use / JEv-ultrafast**\
+ → ambil teknik agent loop dan optimisasi inference yang relevan
+
+ lalu tambahkan:
+
+ **Action cache + DOM compression + adaptive model routing.**
+
+ Hasil idealnya:
+
+```
+                   TASK
+                     │
+                     ▼
+              ┌─────────────┐
+              │ Task Router │
+              └──────┬──────┘
+                     │
+         ┌───────────┼───────────┐
+         ▼           ▼           ▼
+      CACHE         DOM         VISION
+         │           │           │
+         ▼           ▼           ▼
+       <1ms       small LLM    big model
+         │           │           │
+         └───────────┼───────────┘
+                     ▼
+                   CDP
+                     ▼
+             REAL CHROME/EDGE
+                     ▼
+           Authenticated Session
+                     ▼
+        LinkedIn / Entra / Instagram
+```
+
+ **Ini menurut saya jauh lebih menjanjikan daripada mencari "browser engine tercepat".** Untuk website enterprise yang berat, Aku sudah menyimpan responmu terakhir ini. Aku ingin ada rencana atau informasi keseluruhan tentang proyek ini supaya nanti aku bisa memberi Google atau agen agar langsung tahu tentang proyek ini. Coba kasih aku rencana atau apa ya bilangnya DRD-nya, MPV-nya, bagaimana sebenarnya yang mau kita capai, targetnya. Beri aku detail lengkap supaya aku bisa menaruhnya di folder dan saya izin langsung membangun harness end to end. bottleneck terbesar sering bukan Chrome-nya—melainkan **berapa kali agent harus berpikir, berapa banyak data dikirim ke model, dan berapa kali screenshot/observation dilakukan**.
+
+ Kalau kamu mau, saya bisa lanjut **bedah repo BrowserSkill \+ Browser Use `jev-ultrafast` \+ Stagehand + Steel**, lalu saya desain **arsitektur OSS "BrowserSkill Ultra"** lengkap dengan komponen, IPC/CDP protocol, caching strategy, model routing, dan benchmark target (mis. **\<100 ms untuk action deterministic dan minim LLM call untuk task panjang**).
+
