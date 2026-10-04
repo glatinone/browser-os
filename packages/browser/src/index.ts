@@ -4,3 +4,4 @@
 // expressed with `protocol` types and the interfaces in `./provider.js`.
 
 export * from './executables.js';
+export * from './profiles.js';
