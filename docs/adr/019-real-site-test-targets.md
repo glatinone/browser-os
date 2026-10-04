@@ -39,7 +39,7 @@ COMPATIBILITY.md needs real-world evidence (P11-01, P12-03). Real sites differ i
 | GitHub (personal account; test repo) | allowed: navigate, search, open issues/PRs in your own test repo. No bulk actions |
 | Google account (**personal, not employer**) | login only through `bos profile open`; then light read-only tasks (e.g. open Google Drive file list) |
 | Microsoft account / **Microsoft 365 Developer tenant** (not the employer tenant) | Entra login via manual setup mode; light read-only tasks |
-| Employer (Constellar) tenant or internal apps | **only with written IT/security approval**; otherwise out of scope |
+| Employer tenant (name withheld for public release) or internal apps | **only with written IT/security approval**; otherwise out of scope |
 
 **Out of the automated matrix in MVP:** LinkedIn, Instagram, Facebook, X and any site whose ToS prohibits automation. COMPATIBILITY rows C12/C13 are marked **"Not tested: ToS restricts automation"**. If the owner later wants evidence there: at most a few manual, human-supervised, read-only sessions on their own account, never scraping third-party data, accepting the ban risk personally.
 
