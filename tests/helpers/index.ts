@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { type FixtureServer, startFixtureServer } from '@browser-os/fixtures/server';
-import type { Clock } from '@browser-os/protocol';
+import { type BrowserProfile, type Clock, newId } from '@browser-os/protocol';
 
 /** Starts the fixture server, runs `fn`, and always closes it. */
 export async function withFixtureServer<T>(fn: (server: FixtureServer) => Promise<T>): Promise<T> {
@@ -36,6 +36,22 @@ export function fakeClock(startMs = 0): Clock & { advance(ms: number): void } {
     advance: (ms: number) => {
       now += ms;
     },
+  };
+}
+
+/**
+ * A profile for a test that does not need a real one. `OpenOptions.profile` is always required,
+ * and every session has a profile row anyway (data-models §2).
+ */
+export function dummyProfile(name = 'test'): BrowserProfile {
+  return {
+    id: newId('prf'),
+    name,
+    channel: 'chromium',
+    userDataDir: path.join(tmpdir(), `bos-unused-${name}`),
+    headless: true,
+    createdAt: Date.now(),
+    lastUsedAt: null,
   };
 }
 

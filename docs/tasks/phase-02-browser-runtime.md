@@ -333,5 +333,35 @@ Runtime dependency added in this phase: `playwright-core` (in `packages/browser`
 - Browser: kill the browser process (`process.kill(pid)`) → `disconnected` event → `reconnect` restores the URL.
 
 **Acceptance criteria**
-- [ ] `open` twice returns the same session id
-- [ ] Lock tests deterministic (no sleeps; use deferred promises)
+- [x] `open` twice returns the same session id
+- [x] Lock tests deterministic (no sleeps; use deferred promises)
+
+**Implementation notes**
+- **Deviation from the card's browser test.** The card says to kill the browser process with
+  `process.kill(pid)`, but no provider exposes a pid for a browser it launched: LaunchProvider
+  uses a persistent context and `BrowserHandle.pid` is `null` by design (integration §13,
+  asserted in P2-04). The first attempt was a spawned Chromium behind `CdpEndpointProvider`,
+  which does have a pid — but after the browser died the replacement Chromium silently failed to
+  write `DevToolsActivePort` on that port (measured: the port was bindable again within 3 ms, so
+  it is Chrome's own bind that fails, not a lingering socket). The test therefore uses
+  LaunchProvider and quits the browser from the outside with `Browser.close` on the page's CDP
+  session — the same `disconnected` event, no pid involved.
+- **`about:blank` is not a url worth restoring.** A page is activated when it opens and only
+  navigates afterwards; and when a browser dies its pages close one after another, so the active
+  page's fallback (its opener, usually a blank first page) would overwrite the url to restore.
+  `#rememberUrl` ignores `''`/`about:blank`, which is what makes the reconnected page come back
+  on the url it died on. Found by the browser test, not by reasoning.
+- `newPage(url)` waits for the navigation to commit (`Page.frameNavigated`), so the returned
+  `PageInfo` carries the real url; a url Chrome refuses reports `errorText` and is not waited on.
+- `withPageLock` chains per page and keeps the chain alive when the work rejects, so a failed
+  action cannot strand the next caller. `busy` is counted, so it only clears when the last lock
+  is released.
+- `reconnect` retries nothing. A crash followed immediately by a reconnect can land in the window
+  where the OS has not reaped the old process and the profile still reads as locked; the browser
+  test waits for `isProfileLocked` to clear first. A bounded retry inside `reconnect` is a
+  candidate follow-up — the router calls it once (action-router §4.1).
+- Deliberately **not** in this task although spec §3 mentions them: the daemon-start sweep that
+  closes sessions left live by a previous daemon run, and `config.sessionIdleMinutes`. Neither is
+  in the card, and the sweep needs a `list()` on the persistence port that does not exist yet.
+- `tests/helpers` gained `dummyProfile`, and `packages/browser/test/support/dummy-profile.ts` is
+  gone — the dedupe the P2-06 note promised once both branches had landed.
