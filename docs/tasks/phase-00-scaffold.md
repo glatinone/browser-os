@@ -179,6 +179,11 @@ A pnpm workspace-cycle warning between `fixtures` and `tests` surfaced during th
 
 **To move this to `done`:** create the remote, push `main`, open a PR and confirm all three jobs are green.
 
+**DONE 2026-10-04** (remote `github.com/glatinone/browser-os`, branch `main`). Both trigger paths are observed green:
+- push to `main` (run 37169439675): linux pass 21s, windows pass 44s, nightly skipped 0s.
+- pull request #1 (run 37170108250): linux pass 22s, windows pass 37s, nightly skipped — this is the card's acceptance criterion.
+Two annotations remain, both cosmetic and known: `actions/upload-artifact@v4` and `pnpm/action-setup@v4` still target Node 20 (fixed by a later major bump), and GitHub's note that `ubuntu-latest` migrates to Ubuntu 26 on 2026-10-19.
+
 ---
 
 ## P0-04 · Fixture server and fixture sites

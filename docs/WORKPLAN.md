@@ -11,14 +11,13 @@ Status task tetap dilacak di `docs/tasks/README.md`.
 
 ## 1. Kondisi repo saat ini
 
-- **Phase 0 (M0 Scaffold) selesai.** `P0-01`, `P0-02`, `P0-04` = `done`; `P0-03` (CI) = `review` (butuh remote GitHub).
-- Monorepo pnpm berisi sembilan package kosong yang build/typecheck/lint/test hijau, penjaga batas dependency,
-  dan fixture server + 13 halaman. **Belum ada logika produk.**
-- Git aktif di branch `main`, lima commit, worktree bersih. Belum ada remote.
-- **GATE G0 lulus** (2026-10-04) dari clone bersih: `pnpm install --frozen-lockfile`, `pnpm build`,
-  `pnpm -r typecheck`, `pnpm lint`, `pnpm test` (14 file / 31 tes), `pnpm test:coverage`, `pnpm test:browser`,
-  `pnpm test:e2e`, `bos --version` — semuanya exit 0.
-- Task berikutnya menurut rencana: `P1-01` (lihat `docs/tasks/README.md`).
+- **Phase 0 (M0 Scaffold) SELESAI SEPENUHNYA** — `P0-01`, `P0-02`, `P0-03`, `P0-04` semua `done`.
+- **Phase 1 (Protocol) jalan**: `P1-01` dan `P1-02` `done`; `P1-03` dan `P1-04` belum. Belum ada logika produk
+  (belum ada browser, DOM, router).
+- Repo publik di **https://github.com/glatinone/browser-os** (branch `main`). CI hijau di dua jalur: push ke `main`
+  dan pull request (PR #1) — linux, windows, nightly di-skip.
+- **GATE G0 lulus** (2026-10-04) dari clone bersih, dan terulang di CI setiap push.
+- Task berikutnya menurut rencana: `P1-03` (lihat `docs/tasks/README.md`).
 
 ## 2. Keputusan lingkungan (diambil pemilik, 2026-10-04)
 
