@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *' # nightly at 02:00 UTC (TESTING.md §7)
+
+# Nothing in this workflow writes to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Node 26 and pnpm 12.8.1 per docs/WORKPLAN.md §2 (engines.node is ">=26").
+  # pnpm reads its version from package.json "packageManager", so it is stated once.
+  NODE_VERSION: '26'
+
+jobs:
+  linux:
+    name: linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Lint (biome + package boundaries)
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      # Browser and e2e tests only exist once packages/browser declares playwright-core (P2-04).
+      - name: Browser tests
+        if: hashFiles('packages/browser/node_modules/playwright-core/package.json') != ''
+        run: |
+          pnpm exec playwright-core install --with-deps chromium
+          pnpm test:browser
+
+      - name: End-to-end tests
+        if: hashFiles('tests/e2e/*.e2e.test.ts') != ''
+        run: pnpm test:e2e
+
+      - name: Coverage report
+        run: pnpm test:coverage
+
+      # Coverage thresholds only fail the job from P10 onwards (TESTING.md §9).
+      - name: Upload coverage and benchmark reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-coverage
+          path: |
+            coverage/
+            benchmarks/results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  windows:
+    name: windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Lint (biome + package boundaries)
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      # Unit tests only. Windows-specific browser tests are tagged and added in P2/P8.
+      - name: Unit tests
+        run: pnpm test
+
+  nightly-bench:
+    name: nightly benchmarks
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      # Placeholder until the harness lands in P10-01/P10-06.
+      - name: Benchmarks
+        run: pnpm bench
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-bench
+          path: benchmarks/results/
+          if-no-files-found: ignore
+          retention-days: 30

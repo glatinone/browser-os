@@ -1,6 +1,9 @@
 import { readdir } from 'node:fs/promises';
-import { fakeClock, withFixtureServer, withTempBosHome } from '@browser-os/tests/helpers';
 import { describe, expect, it } from 'vitest';
+// Relative, not '@browser-os/tests/helpers': fixtures is test data and must not
+// depend on the test infrastructure package, or pnpm reports a workspace cycle
+// (tests already depends on fixtures for the fixture server).
+import { fakeClock, withFixtureServer, withTempBosHome } from '../../tests/helpers/index.js';
 
 describe('test helpers', () => {
   it('withFixtureServer serves pages and always closes the server', async () => {

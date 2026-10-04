@@ -8,8 +8,5 @@
       "source": "./server.ts",
       "default": "./server.ts"
     }
-  },
-  "devDependencies": {
-    "@browser-os/tests": "workspace:*"
   }
 }
