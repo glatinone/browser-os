@@ -27,7 +27,7 @@ Task cards: `phase-XX-*.md` in this folder. Conflicts and questions: `CONFLICTS.
 | P1-03 | Zod schemas and RPC method table | P1-02 | cheap | done |
 | P1-04 | Masking, EventBus, paths, target syntax | P1-02 | cheap | done |
 | **Phase 2** | **Browser runtime** | | | |
-| P2-01 | Browser executable discovery | P1-04 | cheap | todo |
+| P2-01 | Browser executable discovery | P1-04 | cheap | done |
 | P2-02 | Profile directories (filesystem) | P1-04 | cheap | todo |
 | P2-04 | LaunchProvider and PageHandle | P2-01, P2-02 | cheap | todo |
 | P2-03 | CDP transport, counting wrapper, isolated worlds | P2-04 | review | todo |
