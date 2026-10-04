@@ -203,7 +203,30 @@ Read first: `docs/specs/browser-runtime.md` §5–6, `docs/specs/action-router.m
 **Tests:** unit order-of-strategies tests; browser: on `overlay` the Playwright click succeeds after the overlay disappears; fill/select via fallback.
 
 **Acceptance criteria**
-- [ ] Playwright types do not leave `packages/browser`
+- [x] Playwright types do not leave `packages/browser`
+  (`locatorFor` and `playwrightPerform` are internal modules; `dist/index.d.ts` still has zero
+  references to Playwright.)
+
+**Implementation notes**
+- **`getByRole` needs the real ARIA role, and the test utility was not giving one.** `resolveCss`
+  filled `role` with the lowercased tag name, so the fallback called `getByRole('input')`, which
+  Playwright refuses outright. `resolve-css.ts` now reads the pair from
+  `Accessibility.getPartialAXTree`, which also makes the utility a faithful stand-in for the real
+  resolver (P4-01) instead of a rough one.
+- `locatorStrategies()` is exported so the unit tests can assert the order of the strategies
+  directly. An order is a contract, and a test that can only observe the winner is guessing at
+  the rest.
+- `.nth(ordinal)` is applied only when `count() > 1`. On a unique locator it would turn a working
+  strategy into a strict-mode failure.
+- A locator whose role is not one Playwright knows fails as `unknown` rather than quietly falling
+  through to the CSS path. The resolver produces real roles, so this should not happen in
+  practice; if it ever does, that is worth seeing rather than papering over.
+- Timeout mapping: a Playwright `TimeoutError` whose message says it was still `waiting for`
+  something means the action never happened → `TARGET_NOT_INTERACTABLE` with `effect: 'none'`, so
+  the router may escalate safely. Every other error is `unknown` (§4.1).
+- The overlay fixture lifts its cover on an 800 ms timer that has already fired by the time a test
+  can get there, so the test puts the cover back for the CDP refusal and takes it away again for
+  the fallback.
 
 ---
 

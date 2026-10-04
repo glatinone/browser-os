@@ -16,6 +16,7 @@ import { cdpPress } from './cdp-keyboard.js';
 import { cdpClick, cdpHover } from './cdp-pointer.js';
 import { EXTRACTION, type ExtractFormat } from './extract.js';
 import type { CdpContext, DriverOutcome } from './op.js';
+import { playwrightPerform } from './playwright-executor.js';
 import type { DriverResult, PageDriver, ResolvedTarget } from './types.js';
 
 export interface DefaultPageDriverDeps {
@@ -97,35 +98,13 @@ export class DefaultPageDriver implements PageDriver {
   // — the rest of the interface arrives with the tasks below; each one says which —
 
   async cdpPerform(action: BrowserAction, target: ResolvedTarget | null, value?: string): Promise<DriverResult> {
-    const { transport } = await this.#cdp();
-    const urlBefore = this.#page.url();
-    const pagesBefore = this.#knownPageIds?.() ?? [];
-    const navigation = this.#watchNavigation(transport);
-    const ctx: CdpContext = {
-      transport,
-      call: (source, args, at) => this.#call(source, args, at),
-    };
-
-    let outcome: DriverOutcome;
-    try {
-      outcome = await this.#perform(ctx, action, target, value);
-      // A click that navigates, or opens a page, does it just after the input goes out.
-      await this.#until(() => navigation.navigated(), ACTION_GRACE_MS);
-      await this.#until(() => this.#newPageId(pagesBefore) !== undefined, ACTION_GRACE_MS);
-    } finally {
-      navigation.stop();
-    }
-
-    const newPageId = this.#newPageId(pagesBefore);
-    return {
-      ok: outcome.ok,
-      effect: outcome.effect,
-      ...(outcome.error === undefined ? {} : { error: outcome.error }),
-      urlBefore,
-      urlAfter: this.#page.url(),
-      navigated: navigation.navigated(),
-      ...(newPageId === undefined ? {} : { newPageId }),
-    };
+    return await this.#execute(async (transport) => {
+      const ctx: CdpContext = {
+        transport,
+        call: (source, args, at) => this.#call(source, args, at),
+      };
+      return await this.#perform(ctx, action, target, value);
+    });
   }
 
   /**
@@ -162,12 +141,41 @@ export class DefaultPageDriver implements PageDriver {
     }
   }
 
-  async playwrightPerform(
-    _action: BrowserAction,
-    _target: ResolvedTarget | null,
-    _value?: string,
-  ): Promise<DriverResult> {
-    throw this.#notYet('playwrightPerform', 'P3-04');
+  /**
+   * The Playwright fallback, for a target the CDP path refused with `effect: 'none'`
+   * (action-router §6).
+   */
+  async playwrightPerform(action: BrowserAction, target: ResolvedTarget | null, value?: string): Promise<DriverResult> {
+    return await this.#execute(async () => await playwrightPerform(this.#page, action, target, value));
+  }
+
+  /** Wraps one executor call: its outcome, plus what the page did while it ran. */
+  async #execute(work: (transport: CdpTransport) => Promise<DriverOutcome>): Promise<DriverResult> {
+    const { transport } = await this.#cdp();
+    const urlBefore = this.#page.url();
+    const pagesBefore = this.#knownPageIds?.() ?? [];
+    const navigation = this.#watchNavigation(transport);
+
+    let outcome: DriverOutcome;
+    try {
+      outcome = await work(transport);
+      // An action that navigates, or opens a page, does it just after the input goes out.
+      await this.#until(() => navigation.navigated(), ACTION_GRACE_MS);
+      await this.#until(() => this.#newPageId(pagesBefore) !== undefined, ACTION_GRACE_MS);
+    } finally {
+      navigation.stop();
+    }
+
+    const newPageId = this.#newPageId(pagesBefore);
+    return {
+      ok: outcome.ok,
+      effect: outcome.effect,
+      ...(outcome.error === undefined ? {} : { error: outcome.error }),
+      urlBefore,
+      urlAfter: this.#page.url(),
+      navigated: navigation.navigated(),
+      ...(newPageId === undefined ? {} : { newPageId }),
+    };
   }
 
   async waitForLoadState(_state: 'load' | 'domcontentloaded', _timeoutMs?: number): Promise<void> {

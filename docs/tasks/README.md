@@ -38,7 +38,7 @@ Task cards: `phase-XX-*.md` in this folder. Conflicts and questions: `CONFLICTS.
 | P3-01 | PageDriver skeleton, navigate, readValue, extract | P2-03, P2-04 | cheap | done |
 | P3-02 | CDP click/hover with hit-test and effect semantics | P3-01 | expert | done |
 | P3-03 | CDP fill, press, select, scroll | P3-02 | cheap | done |
-| P3-04 | Playwright fallback executor and `locatorFor` | P3-01 | cheap | todo |
+| P3-04 | Playwright fallback executor and `locatorFor` | P3-01 | cheap | done |
 | P3-05 | Settle | P3-01 | cheap | todo |
 | P3-06 | Uploads and downloads | P3-01 | cheap | todo |
 | P3-07 | **M1** e2e "Hands" | P2-07, P3-02, P3-03, P3-04, P3-05 | cheap | todo |
