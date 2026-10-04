@@ -58,13 +58,38 @@ async function spawnChromeWithDebugPort(): Promise<SpawnedChrome> {
       '--headless',
       '--no-first-run',
       '--no-default-browser-check',
+      // Playwright always launches Chromium with the sandbox off (`chromiumSandbox` defaults
+      // to false); a raw spawn does not, and the sandboxed browser is the one that refuses to
+      // start on a CI runner. The shared-memory flag is the other container staple.
+      '--no-sandbox',
+      '--disable-dev-shm-usage',
       'about:blank',
     ],
-    { stdio: 'ignore' },
+    { stdio: ['ignore', 'pipe', 'pipe'] },
   );
 
+  // Keep what the browser says. A silent spawn leaves us guessing, and this only ever fails
+  // on a machine we are not sitting at.
+  let log = '';
+  let exited: string | null = null;
+  child.stdout?.on('data', (chunk: Buffer) => {
+    log += chunk.toString();
+  });
+  child.stderr?.on('data', (chunk: Buffer) => {
+    log += chunk.toString();
+  });
+  child.on('exit', (code) => {
+    exited = `the browser exited with code ${code}`;
+  });
+
   const portFile = path.join(userDataDir, 'DevToolsActivePort');
-  await waitForFile(portFile, 30000);
+  try {
+    await waitForFile(portFile, 30000);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`${reason}${exited === null ? '' : `; ${exited}`}\n${log}`);
+  }
+
   const port = (await readFile(portFile, 'utf8')).split('\n')[0]?.trim();
   if (port === undefined || port === '') throw new Error('DevToolsActivePort carried no port');
 
