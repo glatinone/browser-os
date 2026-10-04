@@ -77,7 +77,7 @@ async function recorded(raw: Page): Promise<string> {
 describe('DefaultPageDriver pointer input', () => {
   it('clicks the submit button and the form submits', async () => {
     await withFixtureServer(async (server) => {
-      const { handle, raw, driver } = await openPage();
+      const { handle, driver } = await openPage();
       try {
         const before = `${server.baseUrl}/basic/`;
         await driver.navigate(before, 15000);

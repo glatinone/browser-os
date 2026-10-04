@@ -129,6 +129,11 @@ Read first: `docs/specs/browser-runtime.md` §5–6, `docs/specs/action-router.m
   `links` on `basic` now reports six links instead of four, and the P3-01 assertion was updated —
   the format reports the links a page has, not only the ones it is currently showing.
 
+- Verification gotcha found by the first CI run for this task: piping a check into `tail` makes
+  the pipeline's exit status `tail`'s, so `pnpm lint | tail -3` prints success while biome has
+  failed. That is how a formatter error and an unused binding reached CI from a "green" local
+  run. Run checks unpiped, or under `set -o pipefail`.
+
 ---
 
 ## P3-03 · CDP fill, press, select, scroll
