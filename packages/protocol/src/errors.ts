@@ -42,10 +42,12 @@ export const ERROR_CODES = [
   'TRAJECTORY_NOT_FOUND',
   'TRAJECTORY_STEP_FAILED',
   // protocol
+  'INVALID_PROFILE_ID',
   'INVALID_REQUEST',
   'UNAUTHORIZED',
   'CANCELLED',
   'INTERNAL',
+  'PROFILE_DIR_CREATE_FAILED',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
