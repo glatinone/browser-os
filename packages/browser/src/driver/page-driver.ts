@@ -15,6 +15,7 @@ import { cdpFill, cdpScroll, cdpSelect } from './cdp-form.js';
 import { cdpPress } from './cdp-keyboard.js';
 import { cdpClick, cdpHover } from './cdp-pointer.js';
 import { EXTRACTION, type ExtractFormat } from './extract.js';
+import { uploadFiles } from './files.js';
 import type { CdpContext, DriverOutcome } from './op.js';
 import { playwrightPerform } from './playwright-executor.js';
 import { type PageActivity, trackActivity } from './settle.js';
@@ -242,8 +243,9 @@ export class DefaultPageDriver implements PageDriver {
     }
   }
 
-  async uploadFiles(_target: ResolvedTarget, _paths: string[]): Promise<DriverResult> {
-    throw this.#notYet('uploadFiles', 'P3-06');
+  /** The paths are the runtime's business: it has already checked them against the policy. */
+  async uploadFiles(target: ResolvedTarget, paths: string[]): Promise<DriverResult> {
+    return await this.#execute(async () => await uploadFiles(this.#page, target, paths));
   }
 
   async screenshot(): Promise<{ base64: string; mediaType: 'image/png' }> {
