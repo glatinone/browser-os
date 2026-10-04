@@ -1,0 +1,68 @@
+{
+  "intents": [
+    {
+      "action": "click",
+      "intent": "Open settings",
+      "expect": {
+        "css": "#open-settings",
+        "role": "button",
+        "name": "Open settings"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the notifications switch",
+      "expect": {
+        "css": "#notifications",
+        "role": "switch",
+        "name": "Notifications"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Save",
+      "expect": {
+        "css": "#save-settings",
+        "role": "button",
+        "name": "Save"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Cancel",
+      "expect": {
+        "css": "#cancel-settings",
+        "role": "button",
+        "name": "Cancel"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Accept",
+      "expect": {
+        "css": "#accept-cookies",
+        "role": "button",
+        "name": "Accept"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Sign out",
+      "expect": {
+        "css": "#behind-2",
+        "role": "button",
+        "name": "Sign out"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the button behind the dialog",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the first dialog button",
+      "expect": null
+    }
+  ]
+}

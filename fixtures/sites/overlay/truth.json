@@ -1,0 +1,60 @@
+{
+  "intents": [
+    {
+      "action": "click",
+      "intent": "Pay invoice",
+      "expect": {
+        "css": "#covered-button",
+        "role": "button",
+        "name": "Pay invoice"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Cancel payment",
+      "expect": {
+        "css": "#free-button",
+        "role": "button",
+        "name": "Cancel payment"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the covered button",
+      "expect": {
+        "css": "#covered-button",
+        "role": "button",
+        "name": "Pay invoice"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the overlay",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the button in the corner",
+      "expect": {
+        "css": "#free-button",
+        "role": "button",
+        "name": "Cancel payment"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the first button",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the transparent layer",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the top most button",
+      "expect": null
+    }
+  ]
+}

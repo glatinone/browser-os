@@ -1,0 +1,15 @@
+{
+  "name": "@browser-os/fixtures",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./server": {
+      "source": "./server.ts",
+      "default": "./server.ts"
+    }
+  },
+  "devDependencies": {
+    "@browser-os/tests": "workspace:*"
+  }
+}

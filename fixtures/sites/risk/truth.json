@@ -1,0 +1,77 @@
+{
+  "intents": [
+    {
+      "action": "click",
+      "intent": "Delete account",
+      "expect": {
+        "css": "button[onclick*='confirm']",
+        "role": "button",
+        "name": "Delete account"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Yes, delete",
+      "expect": {
+        "css": "#confirm button:first-of-type",
+        "role": "button",
+        "name": "Yes, delete"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Keep my account",
+      "expect": {
+        "css": "#confirm button:last-of-type",
+        "role": "button",
+        "name": "Keep my account"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Pay now $20",
+      "expect": {
+        "css": "main > p > button",
+        "role": "button",
+        "name": "Pay now $20"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Make admin",
+      "expect": {
+        "css": "main p:nth-of-type(2) button",
+        "role": "button",
+        "name": "Make admin"
+      }
+    },
+    {
+      "action": "fill",
+      "intent": "the message box",
+      "expect": {
+        "css": "#message",
+        "role": "textbox",
+        "name": "Message"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Send message",
+      "expect": {
+        "css": "form button[type=submit]",
+        "role": "button",
+        "name": "Send message"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the dangerous button",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the first button",
+      "expect": null
+    }
+  ]
+}

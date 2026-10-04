@@ -1,0 +1,60 @@
+{
+  "intents": [
+    {
+      "action": "fill",
+      "intent": "the nickname field",
+      "expect": {
+        "css": "#shadow-name",
+        "role": "textbox",
+        "name": "Nickname"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Save nickname",
+      "expect": {
+        "css": "#shadow-save",
+        "role": "button",
+        "name": "Save nickname"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the outer button",
+      "expect": {
+        "css": "main > p > button",
+        "role": "button",
+        "name": "Outer button"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the help link",
+      "expect": {
+        "css": "#shadow-help",
+        "role": "link",
+        "name": "Help"
+      }
+    },
+    {
+      "action": "fill",
+      "intent": "the first input",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the second button",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the panel heading",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the outer link",
+      "expect": null
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Overlay page</title></head>
+<body>
+<main>
+  <h1>Overlay</h1>
+  <div id="cover" style="position:fixed;inset:0;background:rgba(0,0,0,0.01);z-index:10"></div>
+  <p><button id="covered-button" type="button" style="position:relative;z-index:1">Pay invoice</button>
+     <button id="free-button" type="button" style="position:fixed;right:0;bottom:0;z-index:20">Cancel payment</button></p>
+  <p id="paid" hidden>Paid</p>
+</main>
+<script>
+const cover = document.getElementById('cover');
+const paid = document.getElementById('paid');
+document.getElementById('covered-button').addEventListener('click', () => { paid.hidden = false; });
+function removeCover() { cover.style.display = 'none'; }
+cover.addEventListener('click', removeCover);
+document.addEventListener('click', () => setTimeout(removeCover, 0));
+setTimeout(removeCover, 800);
+</script>
+</body>
+</html>

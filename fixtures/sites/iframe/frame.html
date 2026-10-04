@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Sign in</title></head>
+<body>
+  <form onsubmit="event.preventDefault();document.getElementById('frame-done').hidden=false;">
+    <p><label for="frame-username">Username</label><input id="frame-username" name="username" type="text"></p>
+    <p><button id="frame-next" type="submit">Next</button></p>
+  </form>
+  <p id="frame-done" hidden>Signed in</p>
+</body></html>

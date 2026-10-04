@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Account actions</title></head>
+<body>
+<main>
+  <h1>Account actions</h1>
+  <button type="button" onclick="document.getElementById('confirm').hidden=false;">Delete account</button>
+  <div id="confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" hidden>
+    <h2 id="confirm-title">Delete this account?</h2>
+    <button type="button" onclick="document.getElementById('confirm').hidden=true;document.getElementById('done').hidden=false;">Yes, delete</button>
+    <button type="button" onclick="document.getElementById('confirm').hidden=true;">Keep my account</button>
+  </div>
+  <p><button type="button">Pay now $20</button></p>
+  <p><button type="button">Make admin</button></p>
+  <form onsubmit="event.preventDefault();document.getElementById('sent').hidden=false;">
+    <p><label for="message">Message</label><textarea id="message" rows="3"></textarea></p>
+    <p><button type="submit">Send message</button></p>
+  </form>
+  <p id="done" hidden>Account deleted</p>
+  <p id="sent" hidden>Message sent</p>
+</main>
+
+</body>
+</html>

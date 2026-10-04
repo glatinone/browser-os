@@ -1,0 +1,100 @@
+{
+  "intents": [
+    {
+      "action": "fill",
+      "intent": "the search box",
+      "expect": {
+        "css": "#q",
+        "role": "combobox",
+        "name": "Search people"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the search button",
+      "expect": {
+        "css": "#search-form button[type=submit]",
+        "role": "button",
+        "name": "Search"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the Home link",
+      "expect": {
+        "css": "a[href='/spa/']",
+        "role": "link",
+        "name": "Home"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the People link",
+      "expect": {
+        "css": "a[href='/spa/people']",
+        "role": "link",
+        "name": "People"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the Jobs link",
+      "expect": {
+        "css": "a[href='/spa/jobs']",
+        "role": "link",
+        "name": "Jobs"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Messages",
+      "expect": {
+        "css": "a[href='/spa/messages']",
+        "role": "link",
+        "name": "Messages 3"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the first result",
+      "expect": {
+        "css": "#results button[data-index='0']",
+        "role": "button",
+        "name": "Ada Lovelace"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the Contact tab",
+      "expect": {
+        "css": "[role=tab]:nth-of-type(2)",
+        "role": "tab",
+        "name": "Contact"
+      }
+    },
+    {
+      "action": "fill",
+      "intent": "the email field",
+      "expect": {
+        "css": "#email",
+        "role": "textbox",
+        "name": "Email"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "a person in the list",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the blue link",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the second tab",
+      "expect": null
+    }
+  ]
+}

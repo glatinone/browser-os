@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Modal page</title></head>
+<body>
+<main>
+  <h1>Settings</h1>
+  <p><button id="open-settings" type="button">Open settings</button>
+     <button id="behind-1" type="button">Save profile</button>
+     <button id="behind-2" type="button">Sign out</button></p>
+  <dialog id="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <h2 id="settings-title">Settings</h2>
+    <p><label for="notifications">Notifications</label>
+       <button id="notifications" role="switch" aria-checked="false" type="button">Off</button></p>
+    <p><button id="save-settings" type="button">Save</button>
+       <button id="cancel-settings" type="button">Cancel</button></p>
+  </dialog>
+  <dialog id="consent-dialog" role="dialog" aria-modal="true" aria-labelledby="consent-title">
+    <h2 id="consent-title">We use cookies</h2>
+    <p><button id="accept-cookies" type="button">Accept</button>
+       <button id="cancel-cookies" type="button">Cancel</button></p>
+  </dialog>
+</main>
+<script>
+const params = new URLSearchParams(location.search);
+const settings = document.getElementById('settings-dialog');
+const consent = document.getElementById('consent-dialog');
+document.getElementById('open-settings').addEventListener('click', () => settings.showModal());
+document.getElementById('save-settings').addEventListener('click', () => settings.close('saved'));
+document.getElementById('cancel-settings').addEventListener('click', () => settings.close('cancelled'));
+document.getElementById('accept-cookies').addEventListener('click', () => consent.close('accepted'));
+document.getElementById('cancel-cookies').addEventListener('click', () => consent.close('cancelled'));
+if (params.get('variant') === 'open') consent.showModal();</script>
+</body>
+</html>

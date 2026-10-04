@@ -2,5 +2,23 @@
   "name": "@browser-os/tests",
   "version": "0.0.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "exports": {
+    "./helpers": {
+      "source": "./helpers/index.ts",
+      "default": "./helpers/index.ts"
+    }
+  },
+  "dependencies": {
+    "@browser-os/ai": "workspace:*",
+    "@browser-os/browser": "workspace:*",
+    "@browser-os/cli": "workspace:*",
+    "@browser-os/daemon": "workspace:*",
+    "@browser-os/dom": "workspace:*",
+    "@browser-os/fixtures": "workspace:*",
+    "@browser-os/memory": "workspace:*",
+    "@browser-os/protocol": "workspace:*",
+    "@browser-os/runtime": "workspace:*",
+    "@browser-os/sdk": "workspace:*"
+  }
 }

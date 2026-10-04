@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Dynamic page</title></head>
+<body>
+<main>
+  <h1>Live feed</h1>
+  <p><button id="toggle" type="button" aria-pressed="false">Pause reordering</button>
+     <span id="counter" role="status">0 updates</span></p>
+  <p id="late" hidden><button id="late-button" type="button">Confirm order</button></p>
+  <ol id="feed">
+    <li>Ada</li><li>Alan</li><li>Grace</li>
+  </ol>
+</main>
+<script>
+const late = document.getElementById('late');
+setTimeout(() => { late.hidden = false; }, 500);
+const feed = document.getElementById('feed');
+const counter = document.getElementById('counter');
+const toggle = document.getElementById('toggle');
+let updates = 0;
+let reordering = true;
+toggle.addEventListener('click', () => {
+  reordering = !reordering;
+  toggle.setAttribute('aria-pressed', String(!reordering));
+  toggle.textContent = reordering ? 'Pause reordering' : 'Resume reordering';
+});
+setInterval(() => {
+  if (!reordering) return;
+  const first = feed.firstElementChild;
+  feed.appendChild(first);
+  updates += 1;
+  counter.textContent = updates + ' updates';
+}, 1000);</script>
+</body>
+</html>

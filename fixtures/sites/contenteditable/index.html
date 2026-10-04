@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Editor</title></head>
+<body>
+<main>
+  <h1>Rich text</h1>
+  <div id="editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Document body" style="border:1px solid #999;padding:8px;min-height:80px">
+    <p>Hello <b>world</b></p>
+  </div>
+  <p><button type="button" onclick="document.getElementById('saved').hidden=false;">Save</button>
+     <button type="button" onclick="document.getElementById('editor').innerHTML='';">Clear</button></p>
+  <p id="saved" hidden>Saved</p>
+</main>
+
+</body>
+</html>

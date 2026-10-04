@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Basic form page</title></head>
+<body>
+<header>
+  <nav aria-label="Main">
+    <a href="/basic/">Home</a>
+    <a href="/basic/docs">Docs</a>
+    <a href="/basic/pricing">Pricing</a>
+    <a href="/basic/contact">Contact</a>
+  </nav>
+  <button type="button" aria-label="Settings">&#9881;</button>
+</header>
+<main>
+  <h1>Create your account</h1>
+  <form action="/echo" method="post">
+    <p><label for="name">Full name</label>
+       <input id="name" name="name" type="text" autocomplete="name"></p>
+    <p><input id="email" name="email" type="email" placeholder="you@example.com"></p>
+    <p><label for="country">Country</label>
+       <select id="country" name="country">
+         <option value="">Choose a country</option>
+         <option value="id">Indonesia</option>
+         <option value="sg">Singapore</option>
+         <option value="jp">Japan</option>
+       </select></p>
+    <fieldset>
+      <legend>Plan</legend>
+      <label><input type="radio" name="plan" value="monthly"> Monthly</label>
+      <label><input type="radio" name="plan" value="yearly"> Yearly</label>
+    </fieldset>
+    <p><label><input id="newsletter" name="newsletter" type="checkbox" value="yes"> Send me the newsletter</label></p>
+    <p><label><input id="terms" name="terms" type="checkbox" value="yes"> I agree to the terms</label></p>
+    <p><label for="notes">Notes</label><textarea id="notes" name="notes" rows="3"></textarea></p>
+    <p><button type="submit">Create account</button>
+       <button type="button" disabled>Delete everything</button></p>
+  </form>
+</main>
+
+</body>
+</html>

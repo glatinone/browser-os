@@ -1,0 +1,60 @@
+{
+  "intents": [
+    {
+      "action": "click",
+      "intent": "the confirm order button",
+      "expect": {
+        "css": "#late-button",
+        "role": "button",
+        "name": "Confirm order"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Pause reordering",
+      "expect": {
+        "css": "#toggle",
+        "role": "button",
+        "name": "Pause reordering"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the counter",
+      "expect": {
+        "css": "#counter",
+        "role": "status",
+        "name": "0 updates"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Confirm order",
+      "expect": {
+        "css": "#late-button",
+        "role": "button",
+        "name": "Confirm order"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the first list item",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "Grace",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the newest item",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the button that appeared",
+      "expect": null
+    }
+  ]
+}

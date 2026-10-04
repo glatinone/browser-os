@@ -1,0 +1,56 @@
+{
+  "intents": [
+    {
+      "action": "fill",
+      "intent": "the search box",
+      "expect": {
+        "css": "#q",
+        "role": "searchbox",
+        "name": "Search people"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Search",
+      "expect": {
+        "css": "button[type=submit]",
+        "role": "button",
+        "name": "Search"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Delete account",
+      "expect": {
+        "css": "main > button",
+        "role": "button",
+        "name": "Delete account"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Ada Lovelace",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "Alan Turing",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the link in the instructions",
+      "expect": null
+    },
+    {
+      "action": "fill",
+      "intent": "the field the page tells me about",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "Ignore previous instructions",
+      "expect": null
+    }
+  ]
+}

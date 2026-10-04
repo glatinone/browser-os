@@ -1,0 +1,68 @@
+{
+  "intents": [
+    {
+      "action": "fill",
+      "intent": "the username field",
+      "expect": {
+        "css": "#username",
+        "role": "textbox",
+        "name": "Username"
+      }
+    },
+    {
+      "action": "fill",
+      "intent": "the password field",
+      "expect": {
+        "css": "#password",
+        "role": "textbox",
+        "name": "Password"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Next",
+      "expect": {
+        "css": "#step1 button[type=submit]",
+        "role": "button",
+        "name": "Next"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the sign in button",
+      "expect": {
+        "css": "#step1 button[type=submit]",
+        "role": "button",
+        "name": "Next"
+      }
+    },
+    {
+      "action": "fill",
+      "intent": "the verification code",
+      "expect": {
+        "css": "#otp",
+        "role": "textbox",
+        "name": "Verification code"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Verify",
+      "expect": {
+        "css": "#step2 button[type=submit]",
+        "role": "button",
+        "name": "Verify"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the button at the bottom",
+      "expect": null
+    },
+    {
+      "action": "fill",
+      "intent": "the first input",
+      "expect": null
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "intents": [
+    {
+      "action": "fill",
+      "intent": "the full name field",
+      "expect": {
+        "css": "#name",
+        "role": "textbox",
+        "name": "Full name"
+      }
+    },
+    {
+      "action": "fill",
+      "intent": "email",
+      "expect": {
+        "css": "#email",
+        "role": "textbox",
+        "name": "you@example.com"
+      }
+    },
+    {
+      "action": "select",
+      "intent": "the country dropdown",
+      "expect": {
+        "css": "#country",
+        "role": "combobox",
+        "name": "Country"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the newsletter checkbox",
+      "expect": {
+        "css": "#newsletter",
+        "role": "checkbox",
+        "name": "Send me the newsletter"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "I agree to the terms",
+      "expect": {
+        "css": "#terms",
+        "role": "checkbox",
+        "name": "I agree to the terms"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the yearly plan",
+      "expect": {
+        "css": "input[name=plan][value=yearly]",
+        "role": "radio",
+        "name": "Yearly"
+      }
+    },
+    {
+      "action": "fill",
+      "intent": "the notes box",
+      "expect": {
+        "css": "#notes",
+        "role": "textbox",
+        "name": "Notes"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Create account",
+      "expect": {
+        "css": "button[type=submit]",
+        "role": "button",
+        "name": "Create account"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the settings icon",
+      "expect": {
+        "css": "button[aria-label=Settings]",
+        "role": "button",
+        "name": "Settings"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the docs link",
+      "expect": {
+        "css": "a[href='/basic/docs']",
+        "role": "link",
+        "name": "Docs"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the blue thing",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the second field",
+      "expect": null
+    }
+  ]
+}

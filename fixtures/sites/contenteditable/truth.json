@@ -1,0 +1,60 @@
+{
+  "intents": [
+    {
+      "action": "fill",
+      "intent": "the editor",
+      "expect": {
+        "css": "#editor",
+        "role": "textbox",
+        "name": "Document body"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Save",
+      "expect": {
+        "css": "button[onclick*='saved']",
+        "role": "button",
+        "name": "Save"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the rich text area",
+      "expect": {
+        "css": "#editor",
+        "role": "textbox",
+        "name": "Document body"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Clear",
+      "expect": {
+        "css": "button[onclick*='innerHTML']",
+        "role": "button",
+        "name": "Clear"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the bold text",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the second button",
+      "expect": null
+    },
+    {
+      "action": "fill",
+      "intent": "the paragraph",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the toolbar",
+      "expect": null
+    }
+  ]
+}

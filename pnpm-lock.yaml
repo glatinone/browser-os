@@ -185,6 +185,12 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@26.6.4)(@vitest/coverage-v8@5.0.3)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(tsx@4.23.15))
 
+  fixtures:
+    devDependencies:
+      '@browser-os/tests':
+        specifier: workspace:*
+        version: link:../tests
+
   packages/ai:
     dependencies:
       '@browser-os/protocol':
@@ -253,7 +259,38 @@ importers:
         specifier: workspace:*
         version: link:../protocol
 
-  tests: {}
+  tests:
+    dependencies:
+      '@browser-os/ai':
+        specifier: workspace:*
+        version: link:../packages/ai
+      '@browser-os/browser':
+        specifier: workspace:*
+        version: link:../packages/browser
+      '@browser-os/cli':
+        specifier: workspace:*
+        version: link:../packages/cli
+      '@browser-os/daemon':
+        specifier: workspace:*
+        version: link:../packages/daemon
+      '@browser-os/dom':
+        specifier: workspace:*
+        version: link:../packages/dom
+      '@browser-os/fixtures':
+        specifier: workspace:*
+        version: link:../fixtures
+      '@browser-os/memory':
+        specifier: workspace:*
+        version: link:../packages/memory
+      '@browser-os/protocol':
+        specifier: workspace:*
+        version: link:../packages/protocol
+      '@browser-os/runtime':
+        specifier: workspace:*
+        version: link:../packages/runtime
+      '@browser-os/sdk':
+        specifier: workspace:*
+        version: link:../packages/sdk
 
 packages:
 

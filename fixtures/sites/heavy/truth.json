@@ -1,0 +1,56 @@
+{
+  "intents": [
+    {
+      "action": "fill",
+      "intent": "the search box",
+      "expect": {
+        "css": "#q",
+        "role": "searchbox",
+        "name": "Search the catalogue"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Page 42",
+      "expect": {
+        "css": "a[href='/heavy/page-42']",
+        "role": "link",
+        "name": "Page 42"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Page 799",
+      "expect": {
+        "css": "a[href='/heavy/page-799']",
+        "role": "link",
+        "name": "Page 799"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the catalogue table",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "Group 7",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "Child A",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "Record 100",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the last link",
+      "expect": null
+    }
+  ]
+}

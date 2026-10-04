@@ -1,0 +1,60 @@
+{
+  "intents": [
+    {
+      "action": "upload",
+      "intent": "the file picker",
+      "expect": {
+        "css": "#file",
+        "role": "button",
+        "name": "Document"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Upload",
+      "expect": {
+        "css": "button[type=submit]",
+        "role": "button",
+        "name": "Upload"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the document field",
+      "expect": {
+        "css": "#file",
+        "role": "button",
+        "name": "Document"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the upload button",
+      "expect": {
+        "css": "button[type=submit]",
+        "role": "button",
+        "name": "Upload"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the hidden confirmation",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "the last button",
+      "expect": null
+    },
+    {
+      "action": "fill",
+      "intent": "the file name",
+      "expect": null
+    },
+    {
+      "action": "click",
+      "intent": "Browse",
+      "expect": null
+    }
+  ]
+}

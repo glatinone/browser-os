@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Upload</title></head>
+<body>
+<main>
+  <h1>Upload a document</h1>
+  <form onsubmit="event.preventDefault();document.getElementById('echo-name').textContent=document.getElementById('file').files[0]?.name ?? 'no file';document.getElementById('done').hidden=false;">
+    <p><label for="file">Document</label><input id="file" name="file" type="file"></p>
+    <p><button type="submit">Upload</button></p>
+  </form>
+  <p id="done" hidden>Uploaded <span id="echo-name"></span></p>
+</main>
+
+</body>
+</html>

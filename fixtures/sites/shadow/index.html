@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Shadow DOM</title></head>
+<body>
+<main>
+  <h1>Shadow hosts</h1>
+  <bos-panel></bos-panel>
+  <p><button type="button">Outer button</button></p>
+</main>
+<script>
+class BosPanel extends HTMLElement {
+  connectedCallback() {
+    const root = this.attachShadow({ mode: 'open' });
+    root.innerHTML = `
+      <section>
+        <h2>Panel</h2>
+        <label for="shadow-name">Nickname</label>
+        <input id="shadow-name" name="nickname" type="text">
+        <button id="shadow-save" type="button">Save nickname</button>
+        <bos-badge></bos-badge>
+      </section>`;
+    const badge = root.querySelector('bos-badge');
+    const nested = badge.attachShadow({ mode: 'open' });
+    nested.innerHTML = `<a id="shadow-help" href="/shadow/help">Help</a>`;
+  }
+}
+customElements.define('bos-panel', BosPanel);</script>
+</body>
+</html>

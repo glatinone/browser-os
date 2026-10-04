@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>People directory</title></head>
+<body>
+<header>
+  <nav aria-label="Main" id="nav"></nav>
+</header>
+<main id="app"></main>
+<script>
+const params = new URLSearchParams(location.search);
+const mutated = params.get('variant') === 'mutated';
+const cls = (base) => (mutated ? base + '-v2' : base);
+
+const NAV = [
+  { label: 'Home', href: '/spa/' },
+  { label: 'People', href: '/spa/people' },
+  { label: 'Jobs', href: '/spa/jobs' },
+];
+const messages = mutated ? 7 : 3;
+
+function renderNav() {
+  const nav = document.getElementById('nav');
+  nav.innerHTML = '';
+  const items = NAV.map((item) => ({
+    html: `<a class="${cls('nav-link')}" href="${item.href}">${item.label}</a>`,
+  }));
+  items.push({ html: `<a class="${cls('nav-link')}" href="/spa/messages">Messages <span class="${cls('badge')}" data-testid="messages-badge">${messages}</span></a>` });
+  const ordered = mutated ? items.slice().reverse() : items;
+  nav.innerHTML = ordered.map((i) => i.html).join('');
+}
+
+function renderHome() {
+  document.getElementById('app').innerHTML = `
+    <h1>Find people</h1>
+    <form id="search-form" class="${cls('search')}">
+      <input id="q" name="q" type="search" role="combobox" aria-label="Search people"
+             placeholder="Search people" data-testid="search-input" class="${cls('search-input')}">
+      <button type="submit" class="${cls('search-button')}">Search</button>
+    </form>
+    <div id="results" class="${cls('results')}"></div>`;
+  document.getElementById('search-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const query = document.getElementById('q').value;
+    const container = document.getElementById('results');
+    container.innerHTML = '<p>Searching...</p>';
+    setTimeout(() => {
+      const names = [query, 'Grace Hopper', 'Alan Turing'];
+      const list = names
+        .map((name, index) => `<li><button class="${cls('result')}" type="button" data-name="${name}" data-index="${index}">${name}</button></li>`)
+        .join('');
+      const inner = `<ul class="${cls('result-list')}">${list}</ul>`;
+      container.innerHTML = mutated ? `<div class="${cls('results-inner')}">${inner}</div>` : inner;
+      for (const button of container.querySelectorAll('button')) {
+        button.addEventListener('click', () => openProfile(button.dataset.name));
+      }
+    }, 300);
+  });
+}
+
+function openProfile(name) {
+  history.pushState({}, '', '/spa/people/' + encodeURIComponent(name));
+  renderProfile(name);
+}
+
+function renderProfile(name) {
+  document.getElementById('app').innerHTML = `
+    <h1>${name}</h1>
+    <div role="tablist" class="${cls('tabs')}">
+      <button role="tab" aria-selected="true" class="${cls('tab')}" type="button">About</button>
+      <button role="tab" aria-selected="false" class="${cls('tab')}" type="button">Contact</button>
+    </div>
+    <p><label for="email">Email</label>
+       <input id="email" name="email" type="email" readonly value="${name.toLowerCase().replace(/[^a-z]+/g, '.')}@example.com"></p>`;
+  document.querySelectorAll('[role=tab]').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('[role=tab]').forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+    });
+  });
+}
+
+function render() {
+  renderNav();
+  if (location.pathname.startsWith('/spa/people/')) {
+    renderProfile(decodeURIComponent(location.pathname.split('/').pop()));
+  } else {
+    renderHome();
+  }
+}
+window.addEventListener('popstate', render);
+render();
+</script>
+</body>
+</html>

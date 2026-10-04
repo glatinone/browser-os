@@ -39,6 +39,11 @@
           }
         }
       }
+    },
+    {
+      "includes": ["**/fixtures/sites/**"],
+      "formatter": { "enabled": false },
+      "linter": { "enabled": false }
     }
   ]
 }

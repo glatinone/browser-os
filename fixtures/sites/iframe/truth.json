@@ -1,0 +1,68 @@
+{
+  "intents": [
+    {
+      "action": "fill",
+      "intent": "the username in the frame",
+      "expect": {
+        "css": "#frame-username",
+        "role": "textbox",
+        "name": "Username"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "Next in the frame",
+      "expect": {
+        "css": "#frame-next",
+        "role": "button",
+        "name": "Next"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the reload frame button",
+      "expect": {
+        "css": "main > p > button",
+        "role": "button",
+        "name": "Reload frame"
+      }
+    },
+    {
+      "action": "fill",
+      "intent": "the username field",
+      "expect": {
+        "css": "#frame-username",
+        "role": "textbox",
+        "name": "Username"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the button inside the iframe",
+      "expect": {
+        "css": "#frame-next",
+        "role": "button",
+        "name": "Next"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the outer button",
+      "expect": {
+        "css": "main > p > button",
+        "role": "button",
+        "name": "Reload frame"
+      }
+    },
+    {
+      "action": "click",
+      "intent": "the link in the frame",
+      "expect": null
+    },
+    {
+      "action": "fill",
+      "intent": "the password",
+      "expect": null
+    }
+  ]
+}
