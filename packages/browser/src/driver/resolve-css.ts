@@ -59,11 +59,20 @@ export async function resolveCss(transport: CdpTransport, css: string): Promise<
     return at === -1 ? '' : (attributes[at + 1] ?? '');
   };
   const tag = (node.nodeName ?? '').toLowerCase();
-  const name = attribute('aria-label') || attribute('name') || attribute('id');
+
+  // Role and name come from the accessibility tree, not from the tag: a tag name is not a role,
+  // and the name of a labelled field lives in its label.
+  const ax = (await transport.send('Accessibility.getPartialAXTree', {
+    backendNodeId: node.backendNodeId,
+    fetchRelatives: false,
+  })) as { nodes?: { role?: { value?: string }; name?: { value?: string } }[] };
+  const axNode = ax.nodes?.[0];
+  const role = axNode?.role?.value ?? tag;
+  const name = axNode?.name?.value ?? (attribute('aria-label') || attribute('name') || attribute('id'));
 
   const locator: ElementLocator = {
     v: 1,
-    role: tag,
+    role,
     name,
     nameIsDynamic: false,
     tag,
@@ -74,5 +83,5 @@ export async function resolveCss(transport: CdpTransport, css: string): Promise<
     ordinal: 0,
   };
 
-  return { backendNodeId: node.backendNodeId, cdpFrameId, locator, role: tag, name };
+  return { backendNodeId: node.backendNodeId, cdpFrameId, locator, role, name };
 }
