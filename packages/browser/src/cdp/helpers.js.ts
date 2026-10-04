@@ -6,8 +6,8 @@
  * else (SECURITY S19). Installing it twice is a no-op, so a cached world can be reused
  * without stacking up `MutationObserver`s.
  *
- * `probe` and `extract` are deliberate placeholders that throw rather than return
- * `undefined`, so a caller that arrives before P4-09 / P3-01 fails loudly.
+ * `probe` is a deliberate placeholder that throws rather than return `undefined`, so a
+ * caller that arrives before P4-09 fails loudly; the `extract*` helpers arrived with P3-01.
  */
 export const HELPERS_BUNDLE = `(() => {
   if (globalThis.__bos !== undefined) return;
@@ -40,8 +40,31 @@ export const HELPERS_BUNDLE = `(() => {
     probe: () => {
       throw new Error('__bos.probe is not implemented yet (P4-09)');
     },
-    extract: () => {
-      throw new Error('__bos.extract is not implemented yet (P3-01)');
+    extractText: (element, max) => {
+      const target = element ?? document.body;
+      const text = target.innerText ?? '';
+      return text.length > max ? text.slice(0, max) : text;
+    },
+    extractLinks: (element, max) => {
+      const scope = element ?? document;
+      const links = [];
+      for (const anchor of scope.querySelectorAll('a[href]')) {
+        if (links.length >= max) break;
+        links.push({ text: (anchor.innerText ?? '').trim(), href: anchor.href });
+      }
+      return links;
+    },
+    extractTable: (element) => {
+      const scope = element ?? document;
+      const table = scope.tagName === 'TABLE' ? scope : scope.querySelector('table');
+      if (table === null) return [];
+      const rows = [];
+      for (const tr of table.querySelectorAll('tr')) {
+        const cells = [];
+        for (const cell of tr.querySelectorAll('th, td')) cells.push((cell.innerText ?? '').trim());
+        rows.push(cells);
+      }
+      return rows;
     },
   };
 })();

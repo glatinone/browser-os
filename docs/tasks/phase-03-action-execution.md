@@ -27,7 +27,35 @@ Read first: `docs/specs/browser-runtime.md` §5–6, `docs/specs/action-router.m
 **Tests (browser, fixture `basic`):** navigate ok; navigate to a closed port → `NAVIGATION_FAILED`; readValue after typing via Playwright; extract text, links and table.
 
 **Acceptance criteria**
-- [ ] All page-side JS runs in the `bos` world
+- [x] All page-side JS runs in the `bos` world
+
+**Implementation notes**
+- `resolve-css.ts` also calls `Page.getFrameTree`, which the card did not list. `DOM.describeNode`
+  reports a `frameId` only for frame-owner elements, and that is the frame they *contain* — the
+  target is the element itself, so the right frame is the one we query in. Taking `node.frameId`
+  made every ordinary element look like it had no frame.
+- The extraction itself lives in the helper bundle (`__bos.extractText` / `extractLinks` /
+  `extractTable`), replacing the placeholder P2-03 left for this task; `driver/extract.ts` owns
+  the caps and the world call. One source per format serves both cases — targeted and
+  whole-document — because a call with no target carries only an `executionContextId`, which
+  makes `this` the world's global object.
+- `navigate` decides `effect` from what it knows: a url it cannot send at all is `'none'`
+  (nothing left the process), anything else that fails is `'unknown'`. A closed port arrived
+  through the `'unknown'` path (`chrome-error://` final url), measured on fixture-less localhost.
+- `readValue` binds the node with `DOM.resolveNode` inside the `bos` world, so the call doubles
+  as an existence check: a node from an older observation is `STALE_REF`, not a silent `null`.
+- The driver shares the page's CDP session (`PageHandle.driver()` passes `() => this.cdp()`),
+  so §4's "one session per page" still holds with a driver in the picture.
+- The remaining methods throw `INTERNAL` naming the task that fills them (P3-02 .. P3-06, and
+  the vision tier for `screenshot`), as the card asks.
+- Drive-by, not part of this card: the P2-02 Windows profile-lock test spawned `powershell` by
+  name and never listened for the spawn's `error` event, so a worker that cannot resolve it got
+  an uncaught `ENOENT` and then sat out its 20 s poll budget until the timeout. It now spawns the
+  interpreter by full path and reports a failed spawn as a failure; its timeout also covers the
+  budget it asks for rather than the default 5 s.
+- Note for local runs: the tests import `@browser-os/browser` from `dist`, so `pnpm build` has to
+  run first. The documented order (`pnpm build && pnpm -r typecheck && pnpm lint && pnpm test`)
+  already says so, and CI builds before testing.
 
 ---
 

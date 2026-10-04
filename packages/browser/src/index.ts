@@ -7,6 +7,7 @@
 export * from './cdp/counting-transport.js';
 export * from './cdp/isolated-worlds.js';
 export * from './cdp/transport.js';
+export * from './driver/resolve-css.js';
 export * from './driver/types.js';
 export * from './executables.js';
 export * from './manual-launch.js';

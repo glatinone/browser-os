@@ -35,7 +35,7 @@ Task cards: `phase-XX-*.md` in this folder. Conflicts and questions: `CONFLICTS.
 | P2-06 | Manual setup mode launcher | P2-01, P2-02 | cheap | done |
 | P2-07 | Session manager | P2-04, P2-05 | review | done |
 | **Phase 3** | **Action execution** | | | |
-| P3-01 | PageDriver skeleton, navigate, readValue, extract | P2-03, P2-04 | cheap | todo |
+| P3-01 | PageDriver skeleton, navigate, readValue, extract | P2-03, P2-04 | cheap | done |
 | P3-02 | CDP click/hover with hit-test and effect semantics | P3-01 | expert | todo |
 | P3-03 | CDP fill, press, select, scroll | P3-02 | cheap | todo |
 | P3-04 | Playwright fallback executor and `locatorFor` | P3-01 | cheap | todo |
