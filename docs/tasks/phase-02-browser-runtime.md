@@ -163,8 +163,28 @@ Runtime dependency added in this phase: `playwright-core` (in `packages/browser`
 - locked profile → `PROFILE_LOCKED`
 
 **Acceptance criteria**
-- [ ] S2, S4 tests pass
-- [ ] No Playwright type exported from `src/index.ts`
+- [x] S2, S4 tests pass
+- [x] No Playwright type exported from `src/index.ts`
+
+**Implementation notes**
+- Two extra files beyond the card, both type-only so later tasks have something to
+  implement against: `cdp/transport.ts` (`CdpTransport`, for `PageHandle.cdp()`) and
+  `driver/types.ts` (`PageDriver`/`ResolvedTarget`/`DriverResult`, spec §5 + integration §6).
+  `PageHandleImpl` is deliberately **not** re-exported from `src/index.ts`; only the
+  `PageHandle` interface is, which is what keeps Playwright out of the public surface
+  (verified: `grep -c playwright packages/browser/dist/index.d.ts` → 0).
+- `LaunchProvider` takes a `deps` seam (`findExecutable`, `isProfileLocked`) so the two
+  pre-flight checks are unit-tested in `test/launch-provider.test.ts` without a browser.
+  The real lock is still exercised end-to-end: `test/launch-provider.browser.test.ts` opens
+  the same profile twice and the second `open` gets `PROFILE_LOCKED` from Chrome itself.
+- `buildLaunchOptions` defaults `headless` to `profile.headless` rather than `false`, so a
+  profile created headless stays that way unless the caller says otherwise.
+- `packages/browser` now devDepends on `@browser-os/tests` (integration §15) and that package
+  depends on every package, so the workspace has a cycle. `pnpm-workspace.yaml` sets
+  `ignoreWorkspaceCycles: true` or `pnpm -r typecheck` refuses to run at all.
+- Browser-test caveat: a workspace package can be loaded through two module graphs in one
+  Vitest run, so `instanceof` against a class from this package is unreliable in
+  `*.browser.test.ts`; duck-type or compare the file paths instead.
 
 ---
 
