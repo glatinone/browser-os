@@ -4,6 +4,8 @@
 // Playwright page and is deliberately **not** re-exported: only the `PageHandle`
 // interface is, so this entry point stays free of Playwright types.
 
+export * from './cdp/counting-transport.js';
+export * from './cdp/isolated-worlds.js';
 export * from './cdp/transport.js';
 export * from './driver/types.js';
 export * from './executables.js';
