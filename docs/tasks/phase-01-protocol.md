@@ -110,6 +110,33 @@ if they drift.
 - [ ] Every method in protocol §4 is present in `RPC_METHODS`
 - [ ] Type/schema equality assertions compile
 
+**Implementation notes**
+
+Implemented 2026-10-04. `src/schemas.ts` (22 protocol-crossing schemas + `HumanRequest`/`HumanAnswer` + the event union)
+and `src/rpc.ts` (36 methods, wire envelopes, `toRpcError`, `ConfigSchema`). `zod@4.6.5` is the package's only runtime dependency.
+
+**One real bug this task surfaced, worth remembering for the other packages:** `rpc.ts` first imported `BosError`,
+`ErrorCodeSchema` and `isBosError` from the barrel `./index.js` — and `index.js` re-exports `rpc.js`. That is a runtime
+cycle: `index` starts evaluating `rpc`, `rpc` reads back a partially initialised `index`, and `ErrorCodeSchema` arrives as
+`undefined`. zod v4 builds object shapes lazily, so the module loaded fine and only *threw on the first parse*
+("Invalid element at key 'bosCode': expected a Zod schema"). The rule for every later package: a module the barrel
+re-exports must import its siblings by concrete path, never through the barrel.
+
+Three zod v4 behaviours that cost time and are now encoded in the tests:
+- `z.record(z.enum([...]), value)` requires **every** enum key. That is right for `Policy.risk` (the type is a full
+  `Record<RiskLevel, …>` and protocol §6 spells all three); partial overrides are `mergePolicy`'s job, not the schema's.
+- `.default()` on an object whose fields already have defaults needs the **full output** value, not `{}`
+  (hence `PolicySchema.default(DEFAULT_POLICY)`), and the type error only appears at that call site.
+- `z.enum` accepts the `ERROR_CODES` array directly, so `ErrorCodeSchema` picks up any new code automatically.
+
+Tests: a table of 22 schemas each with one valid and two invalid samples (44 negative cases), the 36-method contract
+against the protocol §4 list, `toRpcError` for BosError / plain Error / non-errors, the four wire envelopes, and
+`ConfigSchema` defaults. `pnpm build` also runs the 19 `AssertEqual` checks, so a schema that drifts from its interface
+fails the build rather than a test.
+
+Verification: `pnpm build`, `pnpm -r typecheck`, `pnpm lint` (boundaries OK), `pnpm test` → 19 files / 129 tests pass
+(62 more than P1-02). `packages/protocol/src` coverage 89.6% statements / 95.7% branches.
+
 ---
 
 ## P1-04 · Masking, EventBus, paths, target syntax
