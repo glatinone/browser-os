@@ -11,13 +11,14 @@ Status task tetap dilacak di `docs/tasks/README.md`.
 
 ## 1. Kondisi repo saat ini
 
-- **Phase 0 (M0 Scaffold) SELESAI SEPENUHNYA** — `P0-01`, `P0-02`, `P0-03`, `P0-04` semua `done`.
-- **Phase 1 (Protocol) jalan**: `P1-01` dan `P1-02` `done`; `P1-03` dan `P1-04` belum. Belum ada logika produk
-  (belum ada browser, DOM, router).
+- **Phase 0 (M0 Scaffold) SELESAI** — `P0-01`…`P0-04` semua `done`.
+- **Phase 1 (Protocol) SELESAI** — `P1-01`…`P1-04` semua `done`. `packages/protocol` utuh: id + `BosError`, seluruh
+  tipe data model, 22 zod schema yang cocok dua arah dengan tipenya, 36 method RPC, masking, EventBus, paths, target syntax.
+- **Belum ada logika produk** — belum ada browser, DOM, atau router. Itu mulai di Phase 2.
 - Repo publik di **https://github.com/glatinone/browser-os** (branch `main`). CI hijau di dua jalur: push ke `main`
-  dan pull request (PR #1) — linux, windows, nightly di-skip.
-- **GATE G0 lulus** (2026-10-04) dari clone bersih, dan terulang di CI setiap push.
-- Task berikutnya menurut rencana: `P1-03` (lihat `docs/tasks/README.md`).
+  dan pull request.
+- **GATE G0 lulus** (2026-10-04) dari clone bersih, dan terulang di CI setiap push. Gate berikutnya: **G1** setelah `P3-07`.
+- Task berikutnya menurut rencana: `P2-01` (lihat `docs/tasks/README.md`).
 
 ## 2. Keputusan lingkungan (diambil pemilik, 2026-10-04)
 
