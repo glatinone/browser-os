@@ -38,7 +38,15 @@ Runtime dependency added in this phase: `playwright-core` (in `packages/browser`
 **Tests:** table-driven per platform with a fake `exists`.
 
 **Acceptance criteria**
-- [ ] No filesystem access in tests; all paths built with `node:path` win32/posix variants as appropriate
+- [x] No filesystem access in tests; all paths built with `node:path` win32/posix variants as appropriate
+
+**Implementation notes**
+- The env override is the **first candidate**, not an unconditional answer: it is checked with the
+  injected `exists` and a stale override falls through to the known locations. `chromium` reads
+  `BOS_CHROME_PATH` too (it is the "Chromium family" override).
+- `%LOCALAPPDATA%` is a root only when the variable is set, and `chromium` has no win32/darwin
+  locations at all — Playwright's bundled Chromium is not a system install, so `null` there is the
+  documented result, not a failure.
 
 ---
 
