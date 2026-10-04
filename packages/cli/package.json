@@ -1,0 +1,24 @@
+{
+  "name": "@browser-os/cli",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@browser-os/protocol": "workspace:*",
+    "@browser-os/sdk": "workspace:*"
+  },
+  "bin": {
+    "bos": "./dist/bin.js"
+  }
+}

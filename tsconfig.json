@@ -1,0 +1,32 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "packages/protocol"
+    },
+    {
+      "path": "packages/dom"
+    },
+    {
+      "path": "packages/ai"
+    },
+    {
+      "path": "packages/memory"
+    },
+    {
+      "path": "packages/browser"
+    },
+    {
+      "path": "packages/runtime"
+    },
+    {
+      "path": "packages/daemon"
+    },
+    {
+      "path": "packages/sdk"
+    },
+    {
+      "path": "packages/cli"
+    }
+  ]
+}

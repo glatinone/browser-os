@@ -1,0 +1,13 @@
+packages:
+  - "packages/*"
+  - "fixtures"
+  - "benchmarks"
+  - "examples"
+  - "tests"
+
+# pnpm 12 blocks dependency build scripts by default and uses `allowBuilds`
+# (a map), NOT the older `onlyBuiltDependencies` list. Only entries listed here
+# may run scripts. Adding one must be justified in the task report; runtime deps
+# with a native build are approved by the task that adds them (P2-04, P6-01).
+allowBuilds:
+  esbuild: true
