@@ -159,3 +159,42 @@ Verification: `pnpm build`, `pnpm -r typecheck`, `pnpm lint` (boundaries OK), `p
 
 **Acceptance criteria**
 - [ ] 100% branch coverage on `mask.ts` and `target-syntax.ts`
+
+**Implementation notes**
+
+Implemented 2026-10-04. Five files: `mask.ts`, `event-bus.ts`, `paths.ts`, `target-syntax.ts`, `clock.ts`.
+`mask.ts` and `target-syntax.ts` both report **100% branch coverage**.
+
+Decisions the specs left open, each now pinned by a test:
+
+1. **`maskAction` defaults `sensitiveTarget` to `true`** (integration §2: before resolution the element is unknown, so
+   every literal is masked) and always returns a **new** action object — the input is never mutated, and the tests assert
+   that plus idempotence and that the original value appears nowhere in the output.
+2. **`fieldsOf` lives in `mask.ts`.** integration §2 requires the mapping (`type`→inputType, `aria-label`→ariaLabel) and the
+   card fixes the file list, so it sits beside the check it feeds.
+3. **`paths.ts` joins with the separator of the *platform argument*, never the host.** Otherwise "resolveBosHome is correct
+   on win32/darwin/linux" could only be tested on three machines. A missing/empty `LOCALAPPDATA` falls back to
+   `<home>/AppData/Local`, and `BOS_HOME=''` is treated as unset (an unset variable is often exported as an empty string).
+4. **`parseTargetString` throws `INVALID_REQUEST` for an empty or whitespace-only target** instead of returning an empty
+   intent: an empty target is a caller bug, and failing with a clear code beats a confusing `TARGET_NOT_FOUND` later.
+   Everything else follows the documented catch-all, including `@nope` → intent.
+5. **A fully quoted intent is unwrapped** (`"the search box"` → text `the search box`). Quoting groups words, the way a
+   shell does; keeping the quotes in the target text would leak syntax into the intent. A lone unmatched quote is kept as-is.
+6. **`EventBus` swallows a throwing handler when no `onError` was given.** Library code must not write to the console
+   (CODING_AGENT §7), so the choice is report-via-callback or drop; both are tested, along with unsubscribe-during-emit and
+   subscribe-during-emit.
+
+**One unreachable branch was deleted, not tested.** `tokenize` guarded its tail token with `current.length > 0`, which can
+never be false because the caller trims first. Rather than write a test for code that cannot fail (CODING_AGENT §5), the
+guard is gone — that is what took `target-syntax.ts` from 98.57% to 100% branch coverage.
+
+**A type error only `pnpm build` caught:** `mask.ts` imported `ElementLocator` from `actions.js` instead of `dom.js`. All 191
+tests passed anyway, because esbuild strips types without checking them. This is the concrete reason the documented
+verification order is build → typecheck → lint → test and not the reverse.
+
+**Reading the coverage table:** `funcs` shows 50% for these files and `mask.ts` shows 95% statements with *no* uncovered
+lines. That is a measurement artifact — v8 counts each function twice (the source and its transformed copy) and the second
+copy is never entered, so `5/10` functions is really `5/5`. Lines and branches are reliable; the 50% is not.
+
+Verification: `pnpm build`, `pnpm -r typecheck`, `pnpm lint` (boundaries OK), `pnpm test` → 24 files / 193 tests pass
+(64 more than P1-03).
