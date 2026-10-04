@@ -257,7 +257,23 @@ Runtime dependency added in this phase: `playwright-core` (in `packages/browser`
 **Tests:** unit test of the command builder (asserts the absence of `--remote-debugging-port`, `--remote-debugging-pipe`, `--enable-automation`); `openManual` with an injected fake spawn.
 
 **Acceptance criteria**
-- [ ] Never launches with debugging enabled
+- [x] Never launches with debugging enabled
+
+**Implementation notes**
+- `windowsHide: true` is added to the spawn options beyond the card. On Windows a detached child
+  gets a console window of its own (Node's documented behaviour), which would flash up beside the
+  browser the human just asked for; the flag is harmless elsewhere.
+- The `deps` seam is typed with our own `SpawnedProcess` / `ManualSpawnOptions` rather than node's
+  `SpawnOptions`, which keeps `node:child_process` out of the published declaration and lets the
+  test assert the exact spawn options instead of a subset.
+- `openManual` returns `number | null`: on Windows the pid can still be missing right after spawn,
+  and inventing one would be worse than saying we do not have it.
+- The S1 check (profile dir inside `<BOS_HOME>/profiles`) is deliberately **not** repeated here.
+  The directory was validated when the profile was created (P2-02), and `openManual(profile)` has
+  no `BOS_HOME` to validate against — inventing one would be a second, weaker source of truth.
+- The test file builds its own profile fixture rather than importing one: P2-05 introduces a shared
+  `test/support/dummy-profile.ts`, and depending on an unmerged branch would have made this PR
+  unmergeable on its own. The two can be unified once both have landed.
 
 ---
 
