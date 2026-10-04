@@ -300,7 +300,27 @@ Read first: `docs/specs/browser-runtime.md` §5–6, `docs/specs/action-router.m
 **Tests:** fixture `upload` echoes the filename; `/download/sample.txt` is saved when enabled and cancelled when disabled; filename sanitization unit test.
 
 **Acceptance criteria**
-- [ ] No download is written anywhere unless enabled
+- [x] No download is written anywhere unless enabled
+
+**Implementation notes**
+- Downloads are off unless someone says otherwise: `enableDownloads(page, null)` cancels every
+  download, and nothing is written to disk anywhere until a directory is given. The test asserts
+  exactly that (empty directory, no callback) rather than only checking the happy path.
+- `sanitizeFileName` rewrites both separators, drops control characters, and strips leading dots —
+  those dots are what turn a name into a traversal. A name that is left empty becomes `download`.
+  Control characters are filtered by code point rather than with a character-class regex, because
+  a control character inside a regex literal is the very thing being defended against (and biome
+  rejects it outright).
+- A collision appends `" (n)"` before the extension: `sample.txt`, then `sample (1).txt`.
+- The Playwright failure mapping (`playwrightFailure`) moved into `driver/op.ts` now that two
+  modules need it; the executor keeps using it unchanged.
+- Upload paths are **not** policy-checked here. The runtime does that in P9-07, exactly as the card
+  says, and this module takes absolute paths and does what it is told.
+- `enableDownloads` has no production caller yet: the session-level wiring belongs to the runtime
+  that owns the download policy (P9-07). It is here because the card asks for it, and it is
+  covered by tests.
+- A downloaded file appears in the directory before it is finished, so the test waits for its
+  *content*, not for its name — reading by name alone raced the browser and produced `EBUSY`.
 
 ---
 

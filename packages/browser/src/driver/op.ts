@@ -37,3 +37,18 @@ export function unsure(error: unknown): DriverOutcome {
 export function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
+
+/**
+ * The Playwright executors' failure mapping. Playwright's timeout message says whether it ever got
+ * as far as acting: "waiting for … to be visible / enabled / stable / receive events" means it did
+ * not, so the effect is `none` and the router may still retry or escalate. Anything else may have
+ * gone out, so it is `unknown` (§4.1).
+ */
+export function playwrightFailure(error: unknown, actionType: string): DriverOutcome {
+  const name = error instanceof Error ? error.name : '';
+  const message = error instanceof Error ? error.message : String(error);
+  if (name === 'TimeoutError' && message.includes('waiting for')) {
+    return refuse('TARGET_NOT_INTERACTABLE', `${actionType} never reached the element: ${message}`);
+  }
+  return unsure(error);
+}

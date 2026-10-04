@@ -5,7 +5,7 @@
 import { BosError, type BrowserAction } from '@browser-os/protocol';
 import type { Locator, Page } from 'playwright-core';
 import { locatorFor } from './locator-for.js';
-import { type DriverOutcome, refuse, unsure } from './op.js';
+import { type DriverOutcome, playwrightFailure } from './op.js';
 import type { ResolvedTarget } from './types.js';
 
 /** The budget the spec gives the fallback. */
@@ -68,7 +68,7 @@ export async function playwrightPerform(
         throw new BosError('INVALID_REQUEST', `the Playwright executor does not do ${action.type}`, {});
     }
   } catch (error) {
-    return failed(error, action.type);
+    return playwrightFailure(error, action.type);
   }
 }
 
@@ -84,20 +84,6 @@ function needValue(actionType: string, value: string | undefined): string {
     throw new BosError('INVALID_REQUEST', `A ${actionType} needs a value`, {});
   }
   return value;
-}
-
-/**
- * Playwright's timeout message says whether it ever got as far as acting: "waiting for … to be
- * visible / enabled / stable / receive events" means it did not, so the effect is `none` and the
- * router may still retry or escalate. Anything else may have gone out, so it is `unknown`.
- */
-function failed(error: unknown, actionType: string): DriverOutcome {
-  const name = error instanceof Error ? error.name : '';
-  const message = error instanceof Error ? error.message : String(error);
-  if (name === 'TimeoutError' && message.includes('waiting for')) {
-    return refuse('TARGET_NOT_INTERACTABLE', `${actionType} never reached the element: ${message}`);
-  }
-  return unsure(error);
 }
 
 function committed(): DriverOutcome {
