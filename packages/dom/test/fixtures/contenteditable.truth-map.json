@@ -1,0 +1,5 @@
+{
+  "#editor": 17,
+  "button[onclick*='saved']": 26,
+  "button[onclick*='innerHTML']": 29
+}

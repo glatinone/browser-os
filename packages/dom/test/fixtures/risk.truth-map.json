@@ -1,0 +1,9 @@
+{
+  "button[onclick*='confirm']": 20,
+  "#confirm button:first-of-type": 28,
+  "#confirm button:last-of-type": 31,
+  "main > p > button": 36,
+  "main p:nth-of-type(2) button": 40,
+  "#message": 3,
+  "form button[type=submit]": 49
+}

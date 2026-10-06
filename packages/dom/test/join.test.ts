@@ -35,6 +35,18 @@ describe('raw capture fixtures', () => {
     const table = joinRawCapture(raw);
     const childFrameId = raw.documents[1]?.frameId;
     expect(childFrameId).toBeTruthy();
-    expect(table.rows.some((row) => row.frameId === childFrameId)).toBe(true);
+    const hostIndex = table.rows.findIndex((row) => row.tag === 'iframe');
+    const childIndex = table.rows.findIndex((row) => row.frameId === childFrameId && row.tag === 'html');
+    expect(hostIndex).toBeGreaterThanOrEqual(0);
+    expect(childIndex).toBeGreaterThan(hostIndex);
+    expect(table.rows[childIndex]?.parentIdx).toBe(hostIndex);
+  });
+
+  it('marks rows inside an open shadow root with their host', async () => {
+    const table = joinRawCapture(await load('shadow'));
+    const hostIndex = table.rows.findIndex((row) => row.tag === 'bos-panel');
+    const shadowInput = table.rows.find((row) => row.attrs.id === 'shadow-name');
+    expect(hostIndex).toBeGreaterThanOrEqual(0);
+    expect(shadowInput?.shadowHostIdx).toBe(hostIndex);
   });
 });

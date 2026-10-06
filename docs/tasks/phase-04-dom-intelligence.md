@@ -58,7 +58,10 @@ Implemented the pure normalization and intent parsing utilities with table-drive
 **Tests (browser):** capture on `basic` contains nodes, layout and AX for the main frame; capture on `iframe` contains the child document and its AX tree; a forced AX timeout (`frameAxTimeoutMs: 0`) on `iframe` → frame omitted with a warning, main frame still present.
 
 **Acceptance criteria**
-- [ ] Raw fixtures committed for all non-heavy fixture pages
+- [x] Raw fixtures committed for all non-heavy fixture pages
+
+**Implementation notes**
+Recorded all 10 non-heavy fixture pages and added selector truth maps. Browser capture tests cover the main frame, child iframe, and per-frame AX timeout isolation. Status is `review` because the task card requires review supervision.
 
 ---
 
@@ -84,7 +87,10 @@ Implemented the pure normalization and intent parsing utilities with table-drive
 **Tests:** run on every recorded raw capture: invariants (every row has a backendNodeId; parents precede children; iframe rows have `frameId` ≠ main; the shadow fixture has rows with `shadowHostIdx`); plus hand-checked expectations for `basic` (the email input has bounds, an AX role `textbox` and `attrs.placeholder`).
 
 **Acceptance criteria**
-- [ ] Deterministic output (same input → deep-equal output)
+- [x] Deterministic output (same input → deep-equal output)
+
+**Implementation notes**
+`joinRawCapture` now preserves element-parent relationships, inlines child iframe documents at their host position, retains text nodes separately, joins AX data by backend node identity, and identifies open shadow-root descendants by host. Tests cover determinism, iframe ordering, and shadow-root ownership. Status is `review` because this task requires expert review.
 
 ---
 

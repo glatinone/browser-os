@@ -1,0 +1,11 @@
+{
+  "#q": 3,
+  "#search-form button[type=submit]": 37,
+  "a[href='/spa/']": 18,
+  "a[href='/spa/people']": 20,
+  "a[href='/spa/jobs']": 22,
+  "a[href='/spa/messages']": 24,
+  "#results button[data-index='0']": null,
+  "[role=tab]:nth-of-type(2)": null,
+  "#email": null
+}

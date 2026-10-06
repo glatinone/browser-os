@@ -53,68 +53,53 @@ export interface NodeTable {
 export function joinRawCapture(raw: RawCapture): NodeTable {
   const rows: NodeRow[] = [];
   const texts: TextRow[] = [];
-  let globalIdx = 0;
-  const localToGlobal = new Map<string, number>();
+  const localToRow = new Map<string, number>();
+  const hostByDocument = new Map<number, number>();
 
-  for (let docIdx = 0; docIdx < raw.documents.length; docIdx++) {
+  for (const docIdx of inlineDocumentOrder(raw)) {
     const doc = raw.documents[docIdx];
     if (!doc) continue;
-    const nodes = doc.nodes || [];
-    const layouts = doc.layout || [];
-
-    // Build a map of nodeIndex -> layout info
-    const layoutMap = new Map<number, (typeof layouts)[number]>();
-    for (const l of layouts) {
-      layoutMap.set(l.nodeIndex, l);
-    }
-
-    // DOMSnapshot carries the frame identity for each flattened document. Fall back only for
-    // hand-built legacy captures that predate the raw frameId field.
+    const nodes = doc.nodes ?? [];
+    const layoutMap = new Map(doc.layout.map((layout) => [layout.nodeIndex, layout]));
     const frameId = doc.frameId ?? raw.frames[docIdx]?.id ?? raw.frames[0]?.id ?? '';
+    const documentParent = hostByDocument.get(docIdx) ?? null;
 
     for (let nodeIdx = 0; nodeIdx < nodes.length; nodeIdx++) {
-      const n = nodes[nodeIdx];
-      if (!n) continue;
+      const node = nodes[nodeIdx];
+      if (!node) continue;
+      const localParent = node.parentIndex === undefined || node.parentIndex < 0 ? null : node.parentIndex;
+      const parentIdx = nearestElementParent(nodes, localParent, localToRow, docIdx, documentParent);
+      if (node.nodeType !== 1) {
+        if (node.nodeType === 3 && node.textValue && parentIdx !== null)
+          texts.push({ parentIdx, text: node.textValue });
+        continue;
+      }
       const layout = layoutMap.get(nodeIdx);
-      const bounds = layout
-        ? {
-            x: layout.bounds[0],
-            y: layout.bounds[1],
-            w: layout.bounds[2],
-            h: layout.bounds[3],
-          }
-        : null;
-
-      // Convert to viewport coordinates if needed (MVP: assume already in viewport or same origin)
-      // In a full implementation, we'd subtract pageX/pageY and add iframe offsets
-
-      const parentIdx = n.parentIndex === undefined ? null : (localToGlobal.get(`${docIdx}:${n.parentIndex}`) ?? null);
       const row: NodeRow = {
-        idx: globalIdx,
-        backendNodeId: n.backendNodeId ?? 0,
+        idx: rows.length,
+        backendNodeId: node.backendNodeId ?? 0,
         docIndex: docIdx,
         frameId,
         parentIdx,
-        tag: n.nodeName?.toLowerCase() ?? '',
-        attrs: parseAttributes(n.attributes ?? []),
-        shadowHostIdx: null,
-        bounds,
+        tag: node.nodeName?.toLowerCase() ?? '',
+        attrs: parseAttributes(node.attributes ?? []),
+        shadowHostIdx: findShadowHost(nodes, localParent, localToRow, docIdx, documentParent),
+        bounds: layout ? { x: layout.bounds[0], y: layout.bounds[1], w: layout.bounds[2], h: layout.bounds[3] } : null,
         styles: layout?.styles ?? {},
-        paintOrder: null, // DOMSnapshot doesn't provide paint order directly in this format
-        isClickable: n.isClickable ?? false,
-        inputValue: n.inputValue,
-        inputChecked: n.inputChecked,
+        paintOrder: null,
+        isClickable: node.isClickable ?? false,
+        inputValue: node.inputValue,
+        inputChecked: node.inputChecked,
       };
+      rows.push(row);
+      localToRow.set(`${docIdx}:${nodeIdx}`, row.idx);
+    }
 
-      localToGlobal.set(`${docIdx}:${nodeIdx}`, globalIdx);
-      // Only element nodes (nodeType 1) go into rows
-      if (n.nodeType === 1) {
-        rows.push(row);
-      } else if (n.nodeType === 3 && n.textValue && parentIdx !== null) {
-        texts.push({ parentIdx, text: n.textValue });
+    for (const [nodeIdx, node] of nodes.entries()) {
+      if (node?.contentDocumentIndex !== undefined) {
+        const host = localToRow.get(`${docIdx}:${nodeIdx}`);
+        if (host !== undefined) hostByDocument.set(node.contentDocumentIndex, host);
       }
-
-      globalIdx++;
     }
   }
 
@@ -143,6 +128,67 @@ export function joinRawCapture(raw: RawCapture): NodeTable {
     frames: raw.frames,
     viewport: raw.viewport,
   };
+}
+
+function inlineDocumentOrder(raw: RawCapture): number[] {
+  const childrenByDocument = new Map<number, number[]>();
+  for (const [docIdx, doc] of raw.documents.entries()) {
+    for (const node of doc.nodes) {
+      if (node.contentDocumentIndex !== undefined) {
+        const children = childrenByDocument.get(docIdx) ?? [];
+        children.push(node.contentDocumentIndex);
+        childrenByDocument.set(docIdx, children);
+      }
+    }
+  }
+  const order: number[] = [];
+  const visited = new Set<number>();
+  const visit = (docIdx: number): void => {
+    if (visited.has(docIdx) || !raw.documents[docIdx]) return;
+    visited.add(docIdx);
+    order.push(docIdx);
+    for (const child of childrenByDocument.get(docIdx) ?? []) visit(child);
+  };
+  visit(0);
+  for (let docIdx = 0; docIdx < raw.documents.length; docIdx++) visit(docIdx);
+  return order;
+}
+
+function nearestElementParent(
+  nodes: NonNullable<RawCapture['documents'][number]['nodes']>,
+  nodeIdx: number | null,
+  localToRow: Map<string, number>,
+  docIdx: number,
+  documentParent: number | null,
+): number | null {
+  let current = nodeIdx;
+  while (current !== null) {
+    const mapped = localToRow.get(`${docIdx}:${current}`);
+    if (mapped !== undefined) return mapped;
+    current = nodes[current]?.parentIndex ?? null;
+    if (current !== null && current < 0) current = null;
+  }
+  return documentParent;
+}
+
+function findShadowHost(
+  nodes: NonNullable<RawCapture['documents'][number]['nodes']>,
+  nodeIdx: number | null,
+  localToRow: Map<string, number>,
+  docIdx: number,
+  documentParent: number | null,
+): number | null {
+  let current = nodeIdx;
+  while (current !== null) {
+    const node = nodes[current];
+    if (!node) break;
+    if (node.shadowRoot) {
+      return nearestElementParent(nodes, node.parentIndex ?? null, localToRow, docIdx, documentParent);
+    }
+    current = node.parentIndex ?? null;
+    if (current !== null && current < 0) current = null;
+  }
+  return null;
 }
 
 function parseAttributes(attrs: string[]): Record<string, string> {

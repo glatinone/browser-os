@@ -92,7 +92,10 @@ describe('parseIntent', () => {
     ],
     ['open the messages tab', { tokens: ['messages'], exact: null, roleHints: ['tab'], searchBonus: false }],
     ['click checkbox', { tokens: [], exact: null, roleHints: ['checkbox'], searchBonus: false }],
-    ['just a regular phrase', { tokens: ['just', 'regular', 'phrase'], exact: null, roleHints: [], searchBonus: false }],
+    [
+      'just a regular phrase',
+      { tokens: ['just', 'regular', 'phrase'], exact: null, roleHints: [], searchBonus: false },
+    ],
   ])('parses %j', (input, expected) => {
     expect(parseIntent(input)).toEqual(expected);
   });

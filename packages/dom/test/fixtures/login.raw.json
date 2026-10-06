@@ -1,0 +1,2535 @@
+{
+  "_chromeVersion": null,
+  "snapshot": {
+    "strings": [
+      "http://127.0.0.1:53951/login/",
+      "Sign in",
+      "UTF-8",
+      "EED78DCA33A2B66F49819B670C8848C2",
+      "#document",
+      "html",
+      "HTML",
+      "lang",
+      "en",
+      "block",
+      "visible",
+      "1",
+      "auto",
+      "static",
+      "HEAD",
+      "META",
+      "charset",
+      "utf-8",
+      "name",
+      "viewport",
+      "content",
+      "width=device-width, initial-scale=1",
+      "TITLE",
+      "#text",
+      "\n",
+      "BODY",
+      "MAIN",
+      "\n  ",
+      "H1",
+      "FORM",
+      "id",
+      "step1",
+      "onsubmit",
+      "event.preventDefault();document.getElementById('step1').hidden=true;document.getElementById('step2').hidden=false;",
+      "\n    ",
+      "P",
+      "LABEL",
+      "for",
+      "username",
+      "inline",
+      "default",
+      "Username",
+      "INPUT",
+      "type",
+      "text",
+      "autocomplete",
+      "inline-block",
+      "password",
+      "Password",
+      "current-password",
+      "BUTTON",
+      "submit",
+      "Next",
+      "step2",
+      "hidden",
+      "event.preventDefault();document.getElementById('step2').hidden=true;document.getElementById('welcome').hidden=false;",
+      "otp",
+      "Verification code",
+      "inputmode",
+      "numeric",
+      "one-time-code",
+      "Verify",
+      "H2",
+      "welcome",
+      "Welcome",
+      "\n\n\n\n"
+    ],
+    "documents": [
+      {
+        "documentURL": 0,
+        "title": 1,
+        "baseURL": 0,
+        "contentLanguage": -1,
+        "encodingName": 2,
+        "publicId": -1,
+        "systemId": -1,
+        "frameId": 3,
+        "nodes": {
+          "parentIndex": [
+            -1,
+            0,
+            0,
+            2,
+            3,
+            3,
+            3,
+            6,
+            2,
+            2,
+            9,
+            9,
+            11,
+            11,
+            13,
+            11,
+            11,
+            16,
+            16,
+            18,
+            19,
+            18,
+            16,
+            16,
+            23,
+            24,
+            23,
+            16,
+            16,
+            28,
+            29,
+            16,
+            11,
+            11,
+            33,
+            33,
+            35,
+            36,
+            35,
+            33,
+            33,
+            40,
+            41,
+            33,
+            11,
+            11,
+            45,
+            11,
+            9
+          ],
+          "nodeType": [
+            9,
+            10,
+            1,
+            1,
+            1,
+            1,
+            1,
+            3,
+            3,
+            1,
+            3,
+            1,
+            3,
+            1,
+            3,
+            3,
+            1,
+            3,
+            1,
+            1,
+            3,
+            1,
+            3,
+            1,
+            1,
+            3,
+            1,
+            3,
+            1,
+            1,
+            3,
+            3,
+            3,
+            1,
+            3,
+            1,
+            1,
+            3,
+            1,
+            3,
+            1,
+            1,
+            3,
+            3,
+            3,
+            1,
+            3,
+            3,
+            3
+          ],
+          "shadowRootType": {
+            "index": [],
+            "value": []
+          },
+          "nodeName": [
+            4,
+            5,
+            6,
+            14,
+            15,
+            15,
+            22,
+            23,
+            23,
+            25,
+            23,
+            26,
+            23,
+            28,
+            23,
+            23,
+            29,
+            23,
+            35,
+            36,
+            23,
+            42,
+            23,
+            35,
+            36,
+            23,
+            42,
+            23,
+            35,
+            50,
+            23,
+            23,
+            23,
+            29,
+            23,
+            35,
+            36,
+            23,
+            42,
+            23,
+            35,
+            50,
+            23,
+            23,
+            23,
+            62,
+            23,
+            23,
+            23
+          ],
+          "nodeValue": [
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            1,
+            24,
+            -1,
+            24,
+            -1,
+            27,
+            -1,
+            1,
+            27,
+            -1,
+            34,
+            -1,
+            -1,
+            41,
+            -1,
+            34,
+            -1,
+            -1,
+            48,
+            -1,
+            34,
+            -1,
+            -1,
+            52,
+            27,
+            27,
+            -1,
+            34,
+            -1,
+            -1,
+            57,
+            -1,
+            34,
+            -1,
+            -1,
+            61,
+            27,
+            27,
+            -1,
+            64,
+            24,
+            65
+          ],
+          "backendNodeId": [
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            1,
+            24,
+            25,
+            26,
+            27,
+            2,
+            28,
+            29,
+            30,
+            31,
+            3,
+            32,
+            33,
+            6,
+            34,
+            35,
+            36,
+            5,
+            37,
+            38,
+            39,
+            40,
+            4,
+            41,
+            42,
+            7,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49
+          ],
+          "attributes": [
+            [],
+            [],
+            [
+              7,
+              8
+            ],
+            [],
+            [
+              16,
+              17
+            ],
+            [
+              18,
+              19,
+              20,
+              21
+            ],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [
+              30,
+              31,
+              32,
+              33
+            ],
+            [],
+            [],
+            [
+              37,
+              38
+            ],
+            [],
+            [
+              30,
+              38,
+              18,
+              38,
+              43,
+              44,
+              45,
+              38
+            ],
+            [],
+            [],
+            [
+              37,
+              47
+            ],
+            [],
+            [
+              30,
+              47,
+              18,
+              47,
+              43,
+              47,
+              45,
+              49
+            ],
+            [],
+            [],
+            [
+              43,
+              51
+            ],
+            [],
+            [],
+            [],
+            [
+              30,
+              53,
+              54,
+              -1,
+              32,
+              55
+            ],
+            [],
+            [],
+            [
+              37,
+              56
+            ],
+            [],
+            [
+              30,
+              56,
+              18,
+              56,
+              43,
+              44,
+              58,
+              59,
+              45,
+              60
+            ],
+            [],
+            [],
+            [
+              43,
+              51
+            ],
+            [],
+            [],
+            [],
+            [
+              30,
+              63,
+              54,
+              -1
+            ],
+            [],
+            [],
+            []
+          ],
+          "textValue": {
+            "index": [],
+            "value": []
+          },
+          "inputValue": {
+            "index": [
+              21,
+              26,
+              38
+            ],
+            "value": [
+              -1,
+              -1,
+              -1
+            ]
+          },
+          "inputChecked": {
+            "index": []
+          },
+          "optionSelected": {
+            "index": []
+          },
+          "contentDocumentIndex": {
+            "index": [],
+            "value": []
+          },
+          "pseudoType": {
+            "index": [],
+            "value": []
+          },
+          "pseudoIdentifier": {
+            "index": [],
+            "value": []
+          },
+          "isClickable": {
+            "index": [
+              19,
+              21,
+              24,
+              26,
+              29,
+              36,
+              38,
+              41
+            ]
+          },
+          "currentSourceURL": {
+            "index": [],
+            "value": []
+          },
+          "originURL": {
+            "index": [],
+            "value": []
+          }
+        },
+        "layout": {
+          "nodeIndex": [
+            0,
+            2,
+            9,
+            11,
+            13,
+            14,
+            16,
+            18,
+            19,
+            20,
+            21,
+            23,
+            24,
+            25,
+            26,
+            28,
+            29,
+            30
+          ],
+          "styles": [
+            [],
+            [
+              9,
+              10,
+              11,
+              12,
+              12,
+              13
+            ],
+            [
+              9,
+              10,
+              11,
+              12,
+              12,
+              13
+            ],
+            [
+              9,
+              10,
+              11,
+              12,
+              12,
+              13
+            ],
+            [
+              9,
+              10,
+              11,
+              12,
+              12,
+              13
+            ],
+            [
+              9,
+              10,
+              11,
+              12,
+              12,
+              13
+            ],
+            [
+              9,
+              10,
+              11,
+              12,
+              12,
+              13
+            ],
+            [
+              9,
+              10,
+              11,
+              12,
+              12,
+              13
+            ],
+            [
+              39,
+              10,
+              11,
+              12,
+              40,
+              13
+            ],
+            [
+              39,
+              10,
+              11,
+              12,
+              40,
+              13
+            ],
+            [
+              46,
+              10,
+              11,
+              12,
+              44,
+              13
+            ],
+            [
+              9,
+              10,
+              11,
+              12,
+              12,
+              13
+            ],
+            [
+              39,
+              10,
+              11,
+              12,
+              40,
+              13
+            ],
+            [
+              39,
+              10,
+              11,
+              12,
+              40,
+              13
+            ],
+            [
+              46,
+              10,
+              11,
+              12,
+              44,
+              13
+            ],
+            [
+              9,
+              10,
+              11,
+              12,
+              12,
+              13
+            ],
+            [
+              46,
+              10,
+              11,
+              12,
+              40,
+              13
+            ],
+            [
+              46,
+              10,
+              11,
+              12,
+              40,
+              13
+            ]
+          ],
+          "bounds": [
+            [
+              0,
+              0,
+              758,
+              482
+            ],
+            [
+              0,
+              0,
+              758,
+              190.875
+            ],
+            [
+              8,
+              21.4375,
+              742,
+              153.4375
+            ],
+            [
+              8,
+              21.4375,
+              742,
+              153.4375
+            ],
+            [
+              8,
+              21.4375,
+              742,
+              37
+            ],
+            [
+              8,
+              21.4375,
+              95.171875,
+              36
+            ],
+            [
+              8,
+              79.875,
+              742,
+              95
+            ],
+            [
+              8,
+              79.875,
+              742,
+              21
+            ],
+            [
+              8,
+              80.875,
+              64.859375,
+              17
+            ],
+            [
+              8,
+              80.875,
+              64.859375,
+              17
+            ],
+            [
+              72.859375,
+              79.875,
+              177,
+              21
+            ],
+            [
+              8,
+              116.875,
+              742,
+              21
+            ],
+            [
+              8,
+              117.875,
+              61.34375,
+              17
+            ],
+            [
+              8,
+              117.875,
+              61.34375,
+              17
+            ],
+            [
+              69.34375,
+              116.875,
+              177,
+              21
+            ],
+            [
+              8,
+              153.875,
+              742,
+              21
+            ],
+            [
+              8,
+              153.875,
+              43.421875,
+              21
+            ],
+            [
+              16,
+              156.875,
+              27.421875,
+              15
+            ]
+          ],
+          "text": [
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            1,
+            -1,
+            -1,
+            -1,
+            41,
+            -1,
+            -1,
+            -1,
+            48,
+            -1,
+            -1,
+            -1,
+            52
+          ],
+          "stackingContexts": {
+            "index": [
+              0,
+              1
+            ]
+          },
+          "paintOrders": [
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            2,
+            1,
+            1,
+            1,
+            4,
+            1,
+            1,
+            1
+          ],
+          "offsetRects": [
+            [],
+            [
+              0,
+              0,
+              758,
+              191
+            ],
+            [
+              0,
+              0,
+              742,
+              153
+            ],
+            [
+              8,
+              21,
+              742,
+              153
+            ],
+            [
+              8,
+              21,
+              742,
+              37
+            ],
+            [],
+            [
+              8,
+              80,
+              742,
+              95
+            ],
+            [
+              8,
+              80,
+              742,
+              21
+            ],
+            [
+              8,
+              81,
+              65,
+              17
+            ],
+            [],
+            [
+              73,
+              80,
+              177,
+              21
+            ],
+            [
+              8,
+              117,
+              742,
+              21
+            ],
+            [
+              8,
+              118,
+              61,
+              17
+            ],
+            [],
+            [
+              69,
+              117,
+              177,
+              21
+            ],
+            [
+              8,
+              154,
+              742,
+              21
+            ],
+            [
+              8,
+              154,
+              43,
+              21
+            ],
+            []
+          ],
+          "scrollRects": [
+            [],
+            [
+              0,
+              0,
+              758,
+              482
+            ],
+            [
+              0,
+              0,
+              742,
+              153
+            ],
+            [
+              0,
+              0,
+              742,
+              153
+            ],
+            [
+              0,
+              0,
+              742,
+              37
+            ],
+            [],
+            [
+              0,
+              0,
+              742,
+              95
+            ],
+            [
+              0,
+              0,
+              742,
+              21
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [],
+            [
+              0,
+              0,
+              173,
+              17
+            ],
+            [
+              0,
+              0,
+              742,
+              21
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [],
+            [
+              0,
+              0,
+              173,
+              17
+            ],
+            [
+              0,
+              0,
+              742,
+              21
+            ],
+            [
+              0,
+              0,
+              39,
+              17
+            ],
+            []
+          ],
+          "clientRects": [
+            [],
+            [
+              0,
+              0,
+              758,
+              482
+            ],
+            [
+              0,
+              0,
+              742,
+              153
+            ],
+            [
+              0,
+              0,
+              742,
+              153
+            ],
+            [
+              0,
+              0,
+              742,
+              37
+            ],
+            [],
+            [
+              0,
+              0,
+              742,
+              95
+            ],
+            [
+              0,
+              0,
+              742,
+              21
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [],
+            [
+              2,
+              2,
+              173,
+              17
+            ],
+            [
+              0,
+              0,
+              742,
+              21
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [],
+            [
+              2,
+              2,
+              173,
+              17
+            ],
+            [
+              0,
+              0,
+              742,
+              21
+            ],
+            [
+              2,
+              2,
+              39,
+              17
+            ],
+            []
+          ]
+        },
+        "textBoxes": {
+          "layoutIndex": [
+            5,
+            9,
+            13,
+            17
+          ],
+          "bounds": [
+            [
+              8,
+              21.4375,
+              95.171875,
+              36
+            ],
+            [
+              8,
+              80.875,
+              64.859375,
+              17
+            ],
+            [
+              8,
+              117.875,
+              61.34375,
+              17
+            ],
+            [
+              16,
+              156.875,
+              27.421875,
+              15
+            ]
+          ],
+          "start": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "length": [
+            7,
+            8,
+            8,
+            4
+          ]
+        },
+        "scrollOffsetX": 0,
+        "scrollOffsetY": 0,
+        "contentWidth": 758,
+        "contentHeight": 482
+      }
+    ]
+  },
+  "layoutMetrics": {
+    "layoutViewport": {
+      "pageX": 0,
+      "pageY": 0,
+      "clientWidth": 758,
+      "clientHeight": 482
+    },
+    "visualViewport": {
+      "offsetX": 0,
+      "offsetY": 0,
+      "pageX": 0,
+      "pageY": 0,
+      "clientWidth": 758,
+      "clientHeight": 482,
+      "scale": 1,
+      "zoom": 1
+    },
+    "contentSize": {
+      "x": 0,
+      "y": 0,
+      "width": 758,
+      "height": 482
+    },
+    "cssLayoutViewport": {
+      "pageX": 0,
+      "pageY": 0,
+      "clientWidth": 758,
+      "clientHeight": 482
+    },
+    "cssVisualViewport": {
+      "offsetX": 0,
+      "offsetY": 0,
+      "pageX": 0,
+      "pageY": 0,
+      "clientWidth": 758,
+      "clientHeight": 482,
+      "scale": 1,
+      "zoom": 1
+    },
+    "cssContentSize": {
+      "x": 0,
+      "y": 0,
+      "width": 758,
+      "height": 482
+    }
+  },
+  "frameTree": {
+    "frame": {
+      "id": "EED78DCA33A2B66F49819B670C8848C2",
+      "loaderId": "F02C447657404478902E3BEF214833B2",
+      "url": "http://127.0.0.1:53951/login/",
+      "domainAndRegistry": "",
+      "securityOrigin": "http://127.0.0.1:53951",
+      "securityOriginDetails": {
+        "isLocalhost": true
+      },
+      "mimeType": "text/html",
+      "adFrameStatus": {
+        "adFrameType": "none"
+      },
+      "secureContextType": "SecureLocalhost",
+      "crossOriginIsolatedContextType": "NotIsolated",
+      "gatedAPIFeatures": []
+    }
+  },
+  "capturedAt": 1791276329613,
+  "documents": [
+    {
+      "frameId": "EED78DCA33A2B66F49819B670C8848C2",
+      "nodes": [
+        {
+          "nodeId": 0,
+          "backendNodeId": 8,
+          "nodeType": 9,
+          "nodeName": "#document",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": -1,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 1,
+          "backendNodeId": 9,
+          "nodeType": 10,
+          "nodeName": "html",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 0,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 2,
+          "backendNodeId": 10,
+          "nodeType": 1,
+          "nodeName": "HTML",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [
+            "lang",
+            "en"
+          ],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 0,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 3,
+          "backendNodeId": 11,
+          "nodeType": 1,
+          "nodeName": "HEAD",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 2,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 4,
+          "backendNodeId": 12,
+          "nodeType": 1,
+          "nodeName": "META",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [
+            "charset",
+            "utf-8"
+          ],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 3,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 5,
+          "backendNodeId": 13,
+          "nodeType": 1,
+          "nodeName": "META",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [
+            "name",
+            "viewport",
+            "content",
+            "width=device-width, initial-scale=1"
+          ],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 3,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 6,
+          "backendNodeId": 14,
+          "nodeType": 1,
+          "nodeName": "TITLE",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 3,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 7,
+          "backendNodeId": 15,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "Sign in",
+          "attributes": [],
+          "textValue": "Sign in",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 6,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 8,
+          "backendNodeId": 16,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "\n",
+          "attributes": [],
+          "textValue": "\n",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 2,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 9,
+          "backendNodeId": 17,
+          "nodeType": 1,
+          "nodeName": "BODY",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 2,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 10,
+          "backendNodeId": 18,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "\n",
+          "attributes": [],
+          "textValue": "\n",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 9,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 11,
+          "backendNodeId": 19,
+          "nodeType": 1,
+          "nodeName": "MAIN",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 9,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 12,
+          "backendNodeId": 20,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "\n  ",
+          "attributes": [],
+          "textValue": "\n  ",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 11,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 13,
+          "backendNodeId": 21,
+          "nodeType": 1,
+          "nodeName": "H1",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 11,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 14,
+          "backendNodeId": 22,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "Sign in",
+          "attributes": [],
+          "textValue": "Sign in",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 13,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 15,
+          "backendNodeId": 23,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "\n  ",
+          "attributes": [],
+          "textValue": "\n  ",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 11,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 16,
+          "backendNodeId": 1,
+          "nodeType": 1,
+          "nodeName": "FORM",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [
+            "id",
+            "step1",
+            "onsubmit",
+            "event.preventDefault();document.getElementById('step1').hidden=true;document.getElementById('step2').hidden=false;"
+          ],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 11,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 17,
+          "backendNodeId": 24,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "\n    ",
+          "attributes": [],
+          "textValue": "\n    ",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 16,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 18,
+          "backendNodeId": 25,
+          "nodeType": 1,
+          "nodeName": "P",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 16,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 19,
+          "backendNodeId": 26,
+          "nodeType": 1,
+          "nodeName": "LABEL",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [
+            "for",
+            "username"
+          ],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": true,
+          "parentIndex": 18,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 20,
+          "backendNodeId": 27,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "Username",
+          "attributes": [],
+          "textValue": "Username",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 19,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 21,
+          "backendNodeId": 2,
+          "nodeType": 1,
+          "nodeName": "INPUT",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [
+            "id",
+            "username",
+            "name",
+            "username",
+            "type",
+            "text",
+            "autocomplete",
+            "username"
+          ],
+          "textValue": "",
+          "inputValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": true,
+          "parentIndex": 18,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 22,
+          "backendNodeId": 28,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "\n    ",
+          "attributes": [],
+          "textValue": "\n    ",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 16,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 23,
+          "backendNodeId": 29,
+          "nodeType": 1,
+          "nodeName": "P",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 16,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 24,
+          "backendNodeId": 30,
+          "nodeType": 1,
+          "nodeName": "LABEL",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [
+            "for",
+            "password"
+          ],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": true,
+          "parentIndex": 23,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 25,
+          "backendNodeId": 31,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "Password",
+          "attributes": [],
+          "textValue": "Password",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 24,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 26,
+          "backendNodeId": 3,
+          "nodeType": 1,
+          "nodeName": "INPUT",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [
+            "id",
+            "password",
+            "name",
+            "password",
+            "type",
+            "password",
+            "autocomplete",
+            "current-password"
+          ],
+          "textValue": "",
+          "inputValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": true,
+          "parentIndex": 23,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 27,
+          "backendNodeId": 32,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "\n    ",
+          "attributes": [],
+          "textValue": "\n    ",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 16,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 28,
+          "backendNodeId": 33,
+          "nodeType": 1,
+          "nodeName": "P",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 16,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 29,
+          "backendNodeId": 6,
+          "nodeType": 1,
+          "nodeName": "BUTTON",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [
+            "type",
+            "submit"
+          ],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": true,
+          "parentIndex": 28,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 30,
+          "backendNodeId": 34,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "Next",
+          "attributes": [],
+          "textValue": "Next",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 29,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 31,
+          "backendNodeId": 35,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "\n  ",
+          "attributes": [],
+          "textValue": "\n  ",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 16,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 32,
+          "backendNodeId": 36,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "\n  ",
+          "attributes": [],
+          "textValue": "\n  ",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 11,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 33,
+          "backendNodeId": 5,
+          "nodeType": 1,
+          "nodeName": "FORM",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [
+            "id",
+            "step2",
+            "hidden",
+            "",
+            "onsubmit",
+            "event.preventDefault();document.getElementById('step2').hidden=true;document.getElementById('welcome').hidden=false;"
+          ],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 11,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 34,
+          "backendNodeId": 37,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "\n    ",
+          "attributes": [],
+          "textValue": "\n    ",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 33,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 35,
+          "backendNodeId": 38,
+          "nodeType": 1,
+          "nodeName": "P",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 33,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 36,
+          "backendNodeId": 39,
+          "nodeType": 1,
+          "nodeName": "LABEL",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [
+            "for",
+            "otp"
+          ],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": true,
+          "parentIndex": 35,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 37,
+          "backendNodeId": 40,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "Verification code",
+          "attributes": [],
+          "textValue": "Verification code",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 36,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 38,
+          "backendNodeId": 4,
+          "nodeType": 1,
+          "nodeName": "INPUT",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [
+            "id",
+            "otp",
+            "name",
+            "otp",
+            "type",
+            "text",
+            "inputmode",
+            "numeric",
+            "autocomplete",
+            "one-time-code"
+          ],
+          "textValue": "",
+          "inputValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": true,
+          "parentIndex": 35,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 39,
+          "backendNodeId": 41,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "\n    ",
+          "attributes": [],
+          "textValue": "\n    ",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 33,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 40,
+          "backendNodeId": 42,
+          "nodeType": 1,
+          "nodeName": "P",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 33,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 41,
+          "backendNodeId": 7,
+          "nodeType": 1,
+          "nodeName": "BUTTON",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [
+            "type",
+            "submit"
+          ],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": true,
+          "parentIndex": 40,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 42,
+          "backendNodeId": 43,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "Verify",
+          "attributes": [],
+          "textValue": "Verify",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 41,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 43,
+          "backendNodeId": 44,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "\n  ",
+          "attributes": [],
+          "textValue": "\n  ",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 33,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 44,
+          "backendNodeId": 45,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "\n  ",
+          "attributes": [],
+          "textValue": "\n  ",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 11,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 45,
+          "backendNodeId": 46,
+          "nodeType": 1,
+          "nodeName": "H2",
+          "localName": "",
+          "nodeValue": "",
+          "attributes": [
+            "id",
+            "welcome",
+            "hidden",
+            ""
+          ],
+          "textValue": "",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 11,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 46,
+          "backendNodeId": 47,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "Welcome",
+          "attributes": [],
+          "textValue": "Welcome",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 45,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 47,
+          "backendNodeId": 48,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "\n",
+          "attributes": [],
+          "textValue": "\n",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 11,
+          "childIndexes": []
+        },
+        {
+          "nodeId": 48,
+          "backendNodeId": 49,
+          "nodeType": 3,
+          "nodeName": "#text",
+          "localName": "",
+          "nodeValue": "\n\n\n\n",
+          "attributes": [],
+          "textValue": "\n\n\n\n",
+          "inputChecked": false,
+          "optionSelected": false,
+          "isClickable": false,
+          "parentIndex": 9,
+          "childIndexes": []
+        }
+      ],
+      "layout": [
+        {
+          "nodeIndex": 0,
+          "bounds": [
+            0,
+            0,
+            758,
+            482
+          ],
+          "styles": {}
+        },
+        {
+          "nodeIndex": 2,
+          "bounds": [
+            0,
+            0,
+            758,
+            190.875
+          ],
+          "styles": {
+            "1": "auto",
+            "block": "visible",
+            "auto": "static"
+          }
+        },
+        {
+          "nodeIndex": 9,
+          "bounds": [
+            8,
+            21.4375,
+            742,
+            153.4375
+          ],
+          "styles": {
+            "1": "auto",
+            "block": "visible",
+            "auto": "static"
+          }
+        },
+        {
+          "nodeIndex": 11,
+          "bounds": [
+            8,
+            21.4375,
+            742,
+            153.4375
+          ],
+          "styles": {
+            "1": "auto",
+            "block": "visible",
+            "auto": "static"
+          }
+        },
+        {
+          "nodeIndex": 13,
+          "bounds": [
+            8,
+            21.4375,
+            742,
+            37
+          ],
+          "styles": {
+            "1": "auto",
+            "block": "visible",
+            "auto": "static"
+          }
+        },
+        {
+          "nodeIndex": 14,
+          "bounds": [
+            8,
+            21.4375,
+            95.171875,
+            36
+          ],
+          "styles": {
+            "1": "auto",
+            "block": "visible",
+            "auto": "static"
+          }
+        },
+        {
+          "nodeIndex": 16,
+          "bounds": [
+            8,
+            79.875,
+            742,
+            95
+          ],
+          "styles": {
+            "1": "auto",
+            "block": "visible",
+            "auto": "static"
+          }
+        },
+        {
+          "nodeIndex": 18,
+          "bounds": [
+            8,
+            79.875,
+            742,
+            21
+          ],
+          "styles": {
+            "1": "auto",
+            "block": "visible",
+            "auto": "static"
+          }
+        },
+        {
+          "nodeIndex": 19,
+          "bounds": [
+            8,
+            80.875,
+            64.859375,
+            17
+          ],
+          "styles": {
+            "1": "auto",
+            "inline": "visible",
+            "default": "static"
+          }
+        },
+        {
+          "nodeIndex": 20,
+          "bounds": [
+            8,
+            80.875,
+            64.859375,
+            17
+          ],
+          "styles": {
+            "1": "auto",
+            "inline": "visible",
+            "default": "static"
+          }
+        },
+        {
+          "nodeIndex": 21,
+          "bounds": [
+            72.859375,
+            79.875,
+            177,
+            21
+          ],
+          "styles": {
+            "1": "auto",
+            "inline-block": "visible",
+            "text": "static"
+          }
+        },
+        {
+          "nodeIndex": 23,
+          "bounds": [
+            8,
+            116.875,
+            742,
+            21
+          ],
+          "styles": {
+            "1": "auto",
+            "block": "visible",
+            "auto": "static"
+          }
+        },
+        {
+          "nodeIndex": 24,
+          "bounds": [
+            8,
+            117.875,
+            61.34375,
+            17
+          ],
+          "styles": {
+            "1": "auto",
+            "inline": "visible",
+            "default": "static"
+          }
+        },
+        {
+          "nodeIndex": 25,
+          "bounds": [
+            8,
+            117.875,
+            61.34375,
+            17
+          ],
+          "styles": {
+            "1": "auto",
+            "inline": "visible",
+            "default": "static"
+          }
+        },
+        {
+          "nodeIndex": 26,
+          "bounds": [
+            69.34375,
+            116.875,
+            177,
+            21
+          ],
+          "styles": {
+            "1": "auto",
+            "inline-block": "visible",
+            "text": "static"
+          }
+        },
+        {
+          "nodeIndex": 28,
+          "bounds": [
+            8,
+            153.875,
+            742,
+            21
+          ],
+          "styles": {
+            "1": "auto",
+            "block": "visible",
+            "auto": "static"
+          }
+        },
+        {
+          "nodeIndex": 29,
+          "bounds": [
+            8,
+            153.875,
+            43.421875,
+            21
+          ],
+          "styles": {
+            "1": "auto",
+            "inline-block": "visible",
+            "default": "static"
+          }
+        },
+        {
+          "nodeIndex": 30,
+          "bounds": [
+            16,
+            156.875,
+            27.421875,
+            15
+          ],
+          "styles": {
+            "1": "auto",
+            "inline-block": "visible",
+            "default": "static"
+          }
+        }
+      ]
+    }
+  ],
+  "axTrees": [
+    {
+      "frameId": "EED78DCA33A2B66F49819B670C8848C2",
+      "nodes": [
+        {
+          "backendDOMNodeId": 8,
+          "role": "RootWebArea",
+          "name": "Sign in",
+          "ignored": false,
+          "props": {
+            "focusable": true,
+            "focused": true,
+            "url": "http://127.0.0.1:53951/login/"
+          }
+        },
+        {
+          "backendDOMNodeId": 10,
+          "role": "none",
+          "name": "",
+          "ignored": true,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": 17,
+          "role": "none",
+          "name": "",
+          "ignored": true,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": 19,
+          "role": "main",
+          "name": "",
+          "ignored": false,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": 21,
+          "role": "heading",
+          "name": "Sign in",
+          "ignored": false,
+          "props": {
+            "level": 1
+          }
+        },
+        {
+          "backendDOMNodeId": 1,
+          "role": "form",
+          "name": "",
+          "ignored": false,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": 39,
+          "role": "none",
+          "name": "",
+          "ignored": true,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": 40,
+          "role": "none",
+          "name": "",
+          "ignored": true,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": 52,
+          "role": "none",
+          "name": "",
+          "ignored": true,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": 22,
+          "role": "StaticText",
+          "name": "Sign in",
+          "ignored": false,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": 25,
+          "role": "paragraph",
+          "name": "",
+          "ignored": false,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": 29,
+          "role": "paragraph",
+          "name": "",
+          "ignored": false,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": 33,
+          "role": "paragraph",
+          "name": "",
+          "ignored": false,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": "-1000000002",
+          "role": "InlineTextBox",
+          "name": "Sign in",
+          "ignored": false,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": 26,
+          "role": "LabelText",
+          "name": "",
+          "ignored": false,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": 2,
+          "role": "textbox",
+          "name": "Username",
+          "ignored": false,
+          "props": {
+            "invalid": "false",
+            "focusable": true,
+            "editable": "plaintext",
+            "settable": true,
+            "multiline": false,
+            "readonly": false,
+            "required": false,
+            "labelledby": {
+              "type": "nodeList",
+              "relatedNodes": [
+                {
+                  "backendDOMNodeId": 26,
+                  "text": "Username"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "backendDOMNodeId": 30,
+          "role": "LabelText",
+          "name": "",
+          "ignored": false,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": 3,
+          "role": "textbox",
+          "name": "Password",
+          "ignored": false,
+          "props": {
+            "invalid": "false",
+            "focusable": true,
+            "editable": "plaintext",
+            "settable": true,
+            "multiline": false,
+            "readonly": false,
+            "required": false,
+            "labelledby": {
+              "type": "nodeList",
+              "relatedNodes": [
+                {
+                  "backendDOMNodeId": 30,
+                  "text": "Password"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "backendDOMNodeId": 6,
+          "role": "button",
+          "name": "Next",
+          "ignored": false,
+          "props": {
+            "invalid": "false",
+            "focusable": true
+          }
+        },
+        {
+          "backendDOMNodeId": 27,
+          "role": "StaticText",
+          "name": "Username",
+          "ignored": false,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": 50,
+          "role": "generic",
+          "name": "",
+          "ignored": false,
+          "props": {
+            "editable": "plaintext"
+          }
+        },
+        {
+          "backendDOMNodeId": 31,
+          "role": "StaticText",
+          "name": "Password",
+          "ignored": false,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": 51,
+          "role": "generic",
+          "name": "",
+          "ignored": false,
+          "props": {
+            "editable": "plaintext"
+          }
+        },
+        {
+          "backendDOMNodeId": 34,
+          "role": "StaticText",
+          "name": "Next",
+          "ignored": false,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": "-1000000003",
+          "role": "InlineTextBox",
+          "name": "Username",
+          "ignored": false,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": "-1000000004",
+          "role": "InlineTextBox",
+          "name": "Password",
+          "ignored": false,
+          "props": {}
+        },
+        {
+          "backendDOMNodeId": "-1000000005",
+          "role": "InlineTextBox",
+          "name": "Next",
+          "ignored": false,
+          "props": {}
+        }
+      ]
+    }
+  ],
+  "viewport": {
+    "width": 758,
+    "height": 482,
+    "pageX": 0,
+    "pageY": 0
+  },
+  "frames": [
+    {
+      "id": "EED78DCA33A2B66F49819B670C8848C2",
+      "url": "http://127.0.0.1:53951/login/",
+      "parentId": null
+    }
+  ],
+  "warnings": []
+}
