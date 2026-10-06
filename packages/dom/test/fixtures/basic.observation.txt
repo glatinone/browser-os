@@ -1,0 +1,47 @@
+url: http://127.0.0.1/basic/
+title: Basic form page
+dialogs: none
+e1 link "Home" [navigation:Main > banner]
+e2 link "Docs" [navigation:Main > banner]
+e3 link "Pricing" [navigation:Main > banner]
+e4 link "Contact" [navigation:Main > banner]
+e5 button "More" [banner]
+e6 button "Settings" [banner]
+e7 textbox "Full name" [form > main]
+e8 textbox "you@example.com" placeholder="you@example.com" [form > main]
+e9 combobox "Country" value="Choose a country" [form > main]
+e10 radio "Monthly" value="monthly" [group:Plan > form]
+e11 radio "Yearly" value="yearly" [group:Plan > form]
+e12 checkbox "Send me the newsletter" value="yes" [form > main]
+e13 checkbox "I agree to the terms" value="yes" [form > main]
+e14 textbox "Notes" [form > main]
+e15 button "Create account" [form > main]
+e16 button "Delete everything" (disabled) [form > main]
+e17 checkbox "Enable the beta features" value="yes" ↓offscreen [form > main]
+e18 button "Probe" ↓offscreen [main]
+e19 button "Far away" ↓offscreen
+e20 textbox "Controlled" ↓offscreen
+e21 textbox "Locked" ↓offscreen
+e22 button "Load slowly" ↓offscreen
+t1 text "Home"
+t2 text "Docs"
+t3 text "Pricing"
+t4 text "Contact"
+t5 text "More"
+t6 text "⚙"
+t7 heading "Create your account"
+t8 paragraph "Full name"
+t9 paragraph "Country"
+t10 text "Plan"
+t11 text "Monthly"
+t12 text "Yearly"
+t13 paragraph "Send me the newsletter"
+t14 paragraph "I agree to the terms"
+t15 paragraph "Notes"
+t16 paragraph "Create account Delete everything"
+t17 paragraph "Enable the beta features"
+t18 paragraph "Probe -"
+t19 paragraph "Far away"
+t20 paragraph "Controlled"
+t21 paragraph "Locked"
+t22 paragraph "Load slowly no"

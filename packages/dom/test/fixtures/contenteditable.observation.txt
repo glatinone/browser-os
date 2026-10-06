@@ -1,0 +1,9 @@
+url: http://127.0.0.1/contenteditable/
+title: Editor
+dialogs: none
+e1 textbox "Document body" value="Hello world" [main]
+e2 button "Save" [main]
+e3 button "Clear" [main]
+t1 heading "Rich text"
+t2 paragraph "Hello world"
+t3 paragraph "Save Clear"

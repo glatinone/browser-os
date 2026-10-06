@@ -1,0 +1,13 @@
+url: http://127.0.0.1/shadow/
+title: Shadow DOM
+dialogs: none
+e1 textbox "Nickname" [main]
+e2 button "Save nickname" [main]
+e3 link "Help" [main]
+e4 button "Outer button" [main]
+t1 heading "Shadow hosts"
+t2 heading "Panel"
+t3 text "Nickname"
+t4 text "Save nickname"
+t5 text "Help"
+t6 paragraph "Outer button"

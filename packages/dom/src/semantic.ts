@@ -11,6 +11,7 @@ import type { RawCapture } from './capture.js';
 import { isInteractive } from './interactive.js';
 import { joinRawCapture, type NodeRow, type NodeTable, type Rect } from './join.js';
 import { collapse, truncate } from './normalize.js';
+import { estimateTokens, serializeLines } from './serialize.js';
 import { effectiveRect, inViewport, isVisible, modalScope } from './visibility.js';
 
 export type { ObservationIndex } from '@browser-os/protocol';
@@ -41,15 +42,58 @@ export function buildSemanticElements(table: NodeTable, options: SemanticOptions
 export function buildTextBlocks(table: NodeTable, maxTextChars = 4000): TextBlock[] {
   const blocks: TextBlock[] = [];
   let used = 0;
+  let currentKey: string | null = null;
+  let currentTexts: string[] = [];
+  let currentRow: NodeRow | null = null;
+
+  const flush = (): void => {
+    if (!currentRow || currentTexts.length === 0) {
+      currentTexts = [];
+      currentKey = null;
+      currentRow = null;
+      return;
+    }
+    const merged = collapse(currentTexts.join(' '));
+    if (merged) {
+      const remaining = maxTextChars - used;
+      if (remaining <= 0) {
+        currentTexts = [];
+        currentKey = null;
+        currentRow = null;
+        return;
+      }
+      const value = truncate(merged, Math.min(300, remaining));
+      if (value) {
+        const anchorRole = textRole(currentRow);
+        blocks.push({
+          ref: `t${blocks.length + 1}`,
+          text: value,
+          role: anchorRole,
+          ...(anchorRole === 'heading' ? { level: headingLevel(currentRow) } : {}),
+          frame: frameLabel(currentRow, table),
+        });
+        used += value.length;
+      }
+    }
+    currentTexts = [];
+    currentKey = null;
+    currentRow = null;
+  };
+
   for (const text of table.texts) {
     if (used >= maxTextChars) break;
     const row = table.rows.find((candidate) => candidate.idx === text.parentIdx);
-    if (!row || !isVisible(row, table) || !text.text.trim()) continue;
-    const value = truncate(text.text, Math.min(300, maxTextChars - used));
-    if (!value) continue;
-    blocks.push({ ref: `t${blocks.length + 1}`, text: value, role: textRole(row), frame: frameLabel(row, table) });
-    used += value.length;
+    if (!row || !isVisible(row, table)) continue;
+    const collapsed = collapse(text.text ?? '');
+    if (!collapsed) continue;
+    const anchor = nearestTextAncestor(row, table);
+    const key = `${anchor.idx}:${textRole(anchor)}:${frameLabel(anchor, table)}`;
+    if (currentKey !== null && key !== currentKey) flush();
+    currentKey = key;
+    currentRow = anchor;
+    currentTexts.push(collapsed);
   }
+  flush();
   return blocks;
 }
 
@@ -63,14 +107,15 @@ export function buildObservationFromTable(
   warnings: string[] = [],
 ): SemanticBuildResult {
   const id = newId('obs');
-  const elements = buildSemanticElements(table, meta);
+  const scope = modalScope(table);
+  const elementRows = table.rows.filter(
+    (row) =>
+      isInteractive(row, table) &&
+      isVisible(row, table) &&
+      (scope.dialogIdx === null || isInside(row, scope.dialogIdx, table)),
+  );
+  const elements = elementRows.map((row, index) => toSemanticElement(row, index + 1, table, meta.url));
   const text = meta.includeText ? buildTextBlocks(table, meta.maxTextChars) : [];
-  const elementRows = table.rows
-    .filter((row) => isInteractive(row, table) && isVisible(row, table))
-    .filter((row) => {
-      const scope = modalScope(table);
-      return scope.dialogIdx === null || isInside(row, scope.dialogIdx, table);
-    });
   const frames = table.frames.map(
     (frame, index): FrameInfo => ({
       id: `f${index}`,
@@ -90,7 +135,7 @@ export function buildObservationFromTable(
     frames,
     elements,
     text,
-    dialogs: modalScope(table).dialogs,
+    dialogs: scope.dialogs,
     challenge: null,
     warnings: [...warnings],
     stats: {
@@ -103,6 +148,7 @@ export function buildObservationFromTable(
       large: table.rows.length + table.texts.length > 15000,
     },
   };
+  observation.stats.estTokens = estimateTokens(serializeLines(observation));
   const entries = new Map<
     string,
     {
@@ -179,6 +225,12 @@ function toSemanticElement(row: NodeRow, refNumber: number, table: NodeTable, ur
   const value = row.ax?.value ?? row.inputValue;
   const frame = frameLabel(row, table);
   const rect = effectiveRect(row, table);
+  const description =
+    typeof row.ax?.props.description === 'string' && collapse(row.ax.props.description)
+      ? truncate(collapse(row.ax.props.description as string), 120)
+      : attrs.title && attrs.title !== name
+        ? truncate(attrs.title, 120)
+        : undefined;
   return {
     ref: `e${refNumber}`,
     role,
@@ -186,7 +238,7 @@ function toSemanticElement(row: NodeRow, refNumber: number, table: NodeTable, ur
     tag: row.tag,
     ...(value ? { value: sensitive ? MASKED_VALUE : truncate(value, 120) } : {}),
     ...(attrs.placeholder ? { placeholder: truncate(attrs.placeholder, 120) } : {}),
-    ...(attrs.title && attrs.title !== name ? { description: truncate(attrs.title, 120) } : {}),
+    ...(description ? { description } : {}),
     ...(attrs.href ? { href: normalizeHref(attrs.href, url) } : {}),
     ...(inputType ? { inputType } : {}),
     state,
@@ -243,7 +295,7 @@ export function describeSelectOptions(row: NodeRow, table: NodeTable): string | 
   const visit = (parentIdx: number | null): void => {
     for (const candidate of table.rows) {
       if (candidate.parentIdx !== parentIdx) continue;
-      if (candidate.tag === 'option') {
+      if (candidate.tag === 'option' || candidate.tag === 'optgroup') {
         const label =
           candidate.ax?.name ||
           collapse(
@@ -252,7 +304,7 @@ export function describeSelectOptions(row: NodeRow, table: NodeTable): string | 
               .map((text) => text.text)
               .join(' '),
           );
-        if (label) options.push(label);
+        if (candidate.tag === 'option' && label) options.push(label);
       }
       if (options.length >= 10) return;
       visit(candidate.idx);
@@ -261,6 +313,16 @@ export function describeSelectOptions(row: NodeRow, table: NodeTable): string | 
   };
   visit(row.idx);
   return options.length > 0 ? `options: ${options.slice(0, 10).join(' | ')}` : undefined;
+}
+
+function nearestTextAncestor(row: NodeRow, table: NodeTable): NodeRow {
+  const blockRoles = new Set(['heading', 'paragraph', 'listitem', 'cell', 'status', 'alert']);
+  let current: NodeRow | undefined = row;
+  while (current) {
+    if (blockRoles.has(textRole(current))) return current;
+    current = table.rows.find((candidate) => candidate.idx === current?.parentIdx);
+  }
+  return row;
 }
 
 function contexts(row: NodeRow, table: NodeTable): string[] {
@@ -330,5 +392,11 @@ function textRole(row: NodeRow): TextBlock['role'] {
   if (row.ax?.role === 'cell' || row.tag === 'td' || row.tag === 'th') return 'cell';
   if (row.ax?.role === 'status') return 'status';
   if (row.ax?.role === 'alert') return 'alert';
-  return 'paragraph';
+  if (row.ax?.role === 'paragraph' || row.tag === 'p') return 'paragraph';
+  return 'text';
+}
+
+function headingLevel(row: NodeRow): number | undefined {
+  const match = /^h([1-6])$/.exec(row.tag);
+  return match ? Number(match[1]) : undefined;
 }

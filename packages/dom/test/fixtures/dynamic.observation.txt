@@ -1,0 +1,10 @@
+url: http://127.0.0.1/dynamic/
+title: Dynamic page
+dialogs: none
+e1 button "Pause reordering" [main]
+t1 heading "Live feed"
+t2 paragraph "Pause reordering"
+t3 status "0 updates"
+t4 listitem "Ada"
+t5 listitem "Alan"
+t6 listitem "Grace"

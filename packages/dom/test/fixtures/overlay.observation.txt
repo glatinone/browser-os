@@ -1,0 +1,7 @@
+url: http://127.0.0.1/overlay/
+title: Overlay page
+dialogs: none
+e1 button "Pay invoice" [main]
+e2 button "Cancel payment" [main]
+t1 heading "Overlay"
+t2 paragraph "Pay invoice Cancel payment"

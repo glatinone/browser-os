@@ -1,0 +1,16 @@
+url: http://127.0.0.1/spa/
+title: People directory
+dialogs: none
+e1 link "Home" [navigation:Main > banner]
+e2 link "People" [navigation:Main > banner]
+e3 link "Jobs" [navigation:Main > banner]
+e4 link "Messages 3" [navigation:Main > banner]
+e5 combobox "Search people" placeholder="Search people" [form > main]
+e6 button "Search" [form > main]
+t1 text "Home"
+t2 text "People"
+t3 text "Jobs"
+t4 text "Messages"
+t5 text "3"
+t6 heading "Find people"
+t7 text "Search"

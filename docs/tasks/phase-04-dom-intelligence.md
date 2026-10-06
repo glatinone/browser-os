@@ -145,7 +145,10 @@ Implemented pure interactivity, visibility, viewport, modal scope, and labelled 
 
 **Acceptance criteria**
 - [ ] Goldens reviewed by a human/expert before `done` (they define expected behaviour)
-- [ ] The `basic` golden contains the icon button as `button "Settings"` and the disabled button with `(disabled)`
+- [x] The `basic` golden contains the icon button as `button "Settings"` and the disabled button with `(disabled)`
+
+**Implementation notes**
+Semantic output now follows the field rules: role fallback per tag, name fallback chain, select options in the name, password and sensitive masking, AX description priority, frame labels, two nearest contexts, grouped text blocks with heading levels, modal scoping computed once, and token estimate from the serialized lines. Goldens cover all 12 non-heavy fixtures; `basic` asserts the Settings icon button and the disabled button. A live browser test checks the basic element contract. Status is `review` because the task card and the golden review gate require expert review.
 
 ---
 

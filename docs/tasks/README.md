@@ -47,7 +47,7 @@ Task cards: `phase-XX-*.md` in this folder. Conflicts and questions: `CONFLICTS.
 | P4-02 | Raw capture + capture recorder script | P2-03, P3-05, P4-01 | review | review |
 | P4-03 | Join → NodeTable | P4-02 | expert | review |
 | P4-04 | Interactivity and visibility rules | P4-03 | review | review |
-| P4-05 | Semantic output, serialization, goldens | P4-04 | review | todo |
+| P4-05 | Semantic output, serialization, goldens | P4-04 | review | review |
 | P4-06 | Security challenge detection | P4-05 | cheap | todo |
 | P4-07 | Lexical ranking (deterministic tier) | P4-05 | review | todo |
 | P4-08 | Locator build, cssPath, matching | P4-05 | expert | todo |

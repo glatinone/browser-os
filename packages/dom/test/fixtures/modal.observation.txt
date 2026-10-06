@@ -1,0 +1,8 @@
+url: http://127.0.0.1/modal/
+title: Modal page
+dialogs: none
+e1 button "Open settings" [main]
+e2 button "Save profile" [main]
+e3 button "Sign out" [main]
+t1 heading "Settings"
+t2 paragraph "Open settings Save profile Sign out"

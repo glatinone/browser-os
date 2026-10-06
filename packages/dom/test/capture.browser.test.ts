@@ -1,4 +1,4 @@
-import { captureRaw } from '@browser-os/dom';
+import { buildObservation, captureRaw } from '@browser-os/dom';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withFixtureServer } from '../../../tests/helpers/index.js';
 import { launchTestBrowser, type TestBrowser } from '../../../tests/helpers/launch-test-browser.js';
@@ -93,6 +93,41 @@ describe('captureRaw', () => {
           expect(ax?.nodes.length ?? 0).toBe(0);
           expect(raw.warnings.some((warning) => warning.includes(frameId))).toBe(true);
         }
+      } finally {
+        await handle.close();
+      }
+    });
+  });
+
+  it('serializes a live basic capture to the same element contract as the golden', async () => {
+    await withFixtureServer(async (server) => {
+      const handle = await browser.handle().newPage();
+      try {
+        const driver = handle.driver();
+        await driver.navigate(`${server.baseUrl}/basic/`, 15_000);
+        await driver.settle(100, 5_000);
+
+        const raw = await captureRaw(await handle.cdp());
+        const { observation } = buildObservation(raw, {
+          url: `${server.baseUrl}/basic/`,
+          title: 'Basic form page',
+        });
+        const signature = observation.elements.map((element) => `${element.role} ${element.name}`);
+        for (const expected of [
+          'link Home',
+          'link Docs',
+          'button More',
+          'button Settings',
+          'textbox Full name',
+          'combobox Country',
+          'radio Yearly',
+          'checkbox Send me the newsletter',
+          'button Create account',
+          'button Delete everything',
+        ]) {
+          expect(signature).toContain(expected);
+        }
+        expect(observation.elements.some((element) => element.state.disabled)).toBe(true);
       } finally {
         await handle.close();
       }

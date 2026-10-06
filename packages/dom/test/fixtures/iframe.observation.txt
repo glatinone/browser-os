@@ -1,0 +1,6 @@
+url: http://127.0.0.1/iframe/
+title: Frame page
+dialogs: none
+e1 button "Reload frame" [main]
+e2 textbox "Username" [form > main]
+e3 button "Next" [form > main]

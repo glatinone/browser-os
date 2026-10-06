@@ -1,0 +1,14 @@
+url: http://127.0.0.1/risk/
+title: Account actions
+dialogs: none
+e1 button "Delete account" [main]
+e2 button "Pay now $20" [main]
+e3 button "Make admin" [main]
+e4 textbox "Message" [form > main]
+e5 button "Send message" [form > main]
+t1 heading "Account actions"
+t2 text "Delete account"
+t3 paragraph "Pay now $20"
+t4 paragraph "Make admin"
+t5 paragraph "Message"
+t6 paragraph "Send message"

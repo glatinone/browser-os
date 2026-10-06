@@ -1,0 +1,8 @@
+url: http://127.0.0.1/upload/
+title: Upload
+dialogs: none
+e1 button "Document" value="No file chosen" [form > main]
+e2 button "Upload" [form > main]
+t1 heading "Upload a document"
+t2 paragraph "Document"
+t3 paragraph "Upload"
