@@ -33,6 +33,7 @@ export interface RawDocument {
     nodeIndex: number;
     bounds: [number, number, number, number]; // [x, y, w, h]
     styles: Record<string, string>;
+    paintOrder: number | null;
   }>;
 }
 
@@ -107,11 +108,15 @@ function tupleBounds(values: number[] | undefined): [number, number, number, num
   return [values?.[0] ?? 0, values?.[1] ?? 0, values?.[2] ?? 0, values?.[3] ?? 0];
 }
 
-function decodeStyles(values: number[] | undefined, strings: string[] | undefined): Record<string, string> {
+function decodeComputedStyles(values: number[] | undefined, strings: string[] | undefined): Record<string, string> {
+  // DOMSnapshot returns layout styles as one string index per requested
+  // computedStyles entry, in request order:
+  // ['display', 'visibility', 'opacity', 'pointer-events', 'cursor', 'position'].
+  const keys = ['display', 'visibility', 'opacity', 'pointerEvents', 'cursor', 'position'];
   const styles: Record<string, string> = {};
-  for (let index = 0; index + 1 < (values?.length ?? 0); index += 2) {
-    const name = stringAt(strings, values?.[index]);
-    if (name) styles[name] = stringAt(strings, values?.[index + 1]);
+  for (let index = 0; index < (values?.length ?? 0) && index < keys.length; index++) {
+    const value = stringAt(strings, values?.[index]);
+    if (value) styles[keys[index] as string] = value;
   }
   return styles;
 }
@@ -224,7 +229,8 @@ export async function captureRaw(cdp: CdpTransport, opts: { frameAxTimeoutMs?: n
     const rawLayouts = (layout.nodeIndex ?? []).map((nodeIndex, layoutIdx) => ({
       nodeIndex,
       bounds: tupleBounds(layout.bounds?.[layoutIdx]),
-      styles: decodeStyles(layout.styles?.[layoutIdx], snapshot.strings),
+      styles: decodeComputedStyles(layout.styles?.[layoutIdx], snapshot.strings),
+      paintOrder: layout.paintOrders?.[layoutIdx] ?? null,
     }));
     documents.push({
       frameId: doc.frameId === undefined ? undefined : stringAt(snapshot.strings, doc.frameId),

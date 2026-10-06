@@ -11,7 +11,7 @@ import type { RawCapture } from './capture.js';
 import { isInteractive } from './interactive.js';
 import { joinRawCapture, type NodeRow, type NodeTable, type Rect } from './join.js';
 import { collapse, truncate } from './normalize.js';
-import { inViewport, isVisible, modalScope } from './visibility.js';
+import { effectiveRect, inViewport, isVisible, modalScope } from './visibility.js';
 
 export type { ObservationIndex } from '@browser-os/protocol';
 
@@ -178,6 +178,7 @@ function toSemanticElement(row: NodeRow, refNumber: number, table: NodeTable, ur
     state.editable = true;
   const value = row.ax?.value ?? row.inputValue;
   const frame = frameLabel(row, table);
+  const rect = effectiveRect(row, table);
   return {
     ref: `e${refNumber}`,
     role,
@@ -189,8 +190,8 @@ function toSemanticElement(row: NodeRow, refNumber: number, table: NodeTable, ur
     ...(attrs.href ? { href: normalizeHref(attrs.href, url) } : {}),
     ...(inputType ? { inputType } : {}),
     state,
-    inViewport: inViewport(row.bounds, table.viewport),
-    rect: roundedRect(row.bounds),
+    inViewport: inViewport(rect, table.viewport),
+    rect: roundedRect(rect),
     frame,
     context: contexts(row, table),
   };
@@ -220,6 +221,7 @@ function accessibleName(row: NodeRow, table: NodeTable): string {
     .filter((text) => text.parentIdx === row.idx)
     .map((text) => text.text)
     .join(' ');
+  const options = describeSelectOptions(row, table);
   return truncate(
     collapse(
       row.ax?.name ??
@@ -228,10 +230,37 @@ function accessibleName(row: NodeRow, table: NodeTable): string {
         attrs.title ??
         attrs.alt ??
         (row.tag === 'button' ? attrs.value : undefined) ??
-        descendantText,
-    ),
+        descendantText ??
+        '',
+    ) + (options && !row.ax?.name ? ` (${options})` : ''),
     120,
   );
+}
+
+export function describeSelectOptions(row: NodeRow, table: NodeTable): string | undefined {
+  if (row.tag !== 'select') return undefined;
+  const options: string[] = [];
+  const visit = (parentIdx: number | null): void => {
+    for (const candidate of table.rows) {
+      if (candidate.parentIdx !== parentIdx) continue;
+      if (candidate.tag === 'option') {
+        const label =
+          candidate.ax?.name ||
+          collapse(
+            table.texts
+              .filter((text) => text.parentIdx === candidate.idx)
+              .map((text) => text.text)
+              .join(' '),
+          );
+        if (label) options.push(label);
+      }
+      if (options.length >= 10) return;
+      visit(candidate.idx);
+      if (options.length >= 10) return;
+    }
+  };
+  visit(row.idx);
+  return options.length > 0 ? `options: ${options.slice(0, 10).join(' | ')}` : undefined;
 }
 
 function contexts(row: NodeRow, table: NodeTable): string[] {

@@ -1,5 +1,5 @@
 import type { NodeRow, NodeTable } from '@browser-os/dom';
-import { inViewport, isVisible, modalScope } from '@browser-os/dom';
+import { effectiveRect, inViewport, isVisible, modalScope, visibleRect } from '@browser-os/dom';
 import { describe, expect, it } from 'vitest';
 
 const row = (overrides: Partial<NodeRow> = {}): NodeRow => ({
@@ -49,5 +49,36 @@ describe('visibility rules', () => {
       ax: { role: 'dialog', name: 'Second', ignored: false, props: { modal: true } },
     });
     expect(modalScope(table([first, second]))).toEqual({ dialogIdx: 2, dialogs: ['Second', 'First'] });
+  });
+
+  it('keeps a zero-size labeled checkbox and reports the label rect', () => {
+    const input = row({
+      idx: 1,
+      tag: 'input',
+      attrs: { type: 'checkbox', id: 'news' },
+      bounds: { x: 0, y: 0, w: 0, h: 0 },
+      styles: { opacity: '0' },
+    });
+    const label = row({
+      idx: 2,
+      tag: 'label',
+      attrs: { for: 'news' },
+      bounds: { x: 10, y: 20, w: 80, h: 16 },
+    });
+    const rows = [input, label];
+    expect(isVisible(input, table(rows))).toBe(true);
+    expect(effectiveRect(input, table(rows))).toEqual({ x: 10, y: 20, w: 80, h: 16 });
+    expect(visibleRect(input, table(rows))).toEqual({ x: 10, y: 20, w: 80, h: 16 });
+  });
+
+  it('rejects hidden and collapsed subtrees', () => {
+    const root = row({ idx: 1 });
+    const hidden = row({ idx: 2, parentIdx: 1, styles: { visibility: 'hidden' } });
+    const collapsed = row({ idx: 3, parentIdx: 1, styles: { visibility: 'collapse' } });
+    const rows = [root, hidden, collapsed];
+    expect(isVisible(hidden, table(rows))).toBe(false);
+    expect(isVisible(collapsed, table(rows))).toBe(false);
+    expect(visibleRect(hidden, table(rows))).toBeNull();
+    expect(visibleRect(collapsed, table(rows))).toBeNull();
   });
 });

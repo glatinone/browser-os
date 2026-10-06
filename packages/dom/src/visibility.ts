@@ -15,6 +15,20 @@ export function isVisible(row: NodeRow, table: NodeTable): boolean {
   return !hasHiddenAncestor(row, table);
 }
 
+export function effectiveRect(row: NodeRow, table: NodeTable): Rect | null {
+  if (row.bounds && row.bounds.w >= 1 && row.bounds.h >= 1) return row.bounds;
+  return labeledControlRect(row, table);
+}
+
+export function visibleRect(row: NodeRow, table: NodeTable): Rect | null {
+  const rect = effectiveRect(row, table);
+  if (!rect) return null;
+  if (row.styles.display === 'none' || row.styles.visibility === 'hidden' || row.styles.visibility === 'collapse')
+    return null;
+  if (row.styles.opacity === '0' && !labeledControlRect(row, table)) return null;
+  return hasHiddenAncestor(row, table) ? null : rect;
+}
+
 export function modalScope(table: NodeTable): { dialogIdx: number | null; dialogs: string[] } {
   const dialogs = table.rows
     .filter((row) => {
@@ -22,7 +36,7 @@ export function modalScope(table: NodeTable): { dialogIdx: number | null; dialog
       const modal = row.attrs['aria-modal'] === 'true' || row.ax?.props.modal === true;
       return (role === 'dialog' || role === 'alertdialog') && modal && isVisible(row, table);
     })
-    .sort((a, b) => (b.paintOrder ?? -1) - (a.paintOrder ?? -1));
+    .sort((a, b) => (b.paintOrder ?? Number.NEGATIVE_INFINITY) - (a.paintOrder ?? Number.NEGATIVE_INFINITY));
 
   return {
     dialogIdx: dialogs[0]?.idx ?? null,
@@ -50,19 +64,29 @@ function hasHiddenAncestor(row: NodeRow, table: NodeTable): boolean {
 }
 
 function isLabeledFormControl(row: NodeRow, table: NodeTable): boolean {
+  return labeledControlRect(row, table) !== null;
+}
+
+function labeledControlRect(row: NodeRow, table: NodeTable): Rect | null {
   const type = row.attrs.type?.toLowerCase();
-  if (row.tag !== 'input' || (type !== 'checkbox' && type !== 'radio')) return false;
-  if (row.styles.display === 'none' || row.styles.visibility === 'hidden') return false;
+  if (row.tag !== 'input' || (type !== 'checkbox' && type !== 'radio')) return null;
+  if (row.styles.display === 'none' || row.styles.visibility === 'hidden') return null;
 
   const id = row.attrs.id;
-  return table.rows.some((candidate) => {
-    if (candidate.tag !== 'label') return false;
+  for (const candidate of table.rows) {
+    if (candidate.tag !== 'label') continue;
     const labelledFor = candidate.attrs.for;
     const wraps = candidate.parentIdx === row.idx || row.parentIdx === candidate.idx;
-    return Boolean(
-      candidate.bounds && candidate.bounds.w >= 1 && candidate.bounds.h >= 1 && ((id && labelledFor === id) || wraps),
-    );
-  });
+    if (
+      candidate.bounds &&
+      candidate.bounds.w >= 1 &&
+      candidate.bounds.h >= 1 &&
+      ((id && labelledFor === id) || wraps)
+    ) {
+      return candidate.bounds;
+    }
+  }
+  return null;
 }
 
 function parentRow(row: NodeRow, table: NodeTable): NodeRow | undefined {

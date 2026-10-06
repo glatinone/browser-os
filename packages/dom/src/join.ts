@@ -86,7 +86,7 @@ export function joinRawCapture(raw: RawCapture): NodeTable {
         shadowHostIdx: findShadowHost(nodes, localParent, localToRow, docIdx, documentParent),
         bounds: layout ? { x: layout.bounds[0], y: layout.bounds[1], w: layout.bounds[2], h: layout.bounds[3] } : null,
         styles: layout?.styles ?? {},
-        paintOrder: null,
+        paintOrder: layout?.paintOrder ?? null,
         isClickable: node.isClickable ?? false,
         inputValue: node.inputValue,
         inputChecked: node.inputChecked,

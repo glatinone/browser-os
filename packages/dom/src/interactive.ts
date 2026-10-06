@@ -47,6 +47,16 @@ export function hasFocusableSemantics(row: NodeRow): boolean {
   return parseTabIndex(row.attrs.tabindex) >= 0 && row.ax?.props.focusable === true;
 }
 
+export function isTopmostEditable(row: NodeRow, table: NodeTable): boolean {
+  if (!hasEditableSemantics(row)) return false;
+  let parent = parentRow(row, table);
+  while (parent) {
+    if (hasEditableSemantics(parent)) return false;
+    parent = parentRow(parent, table);
+  }
+  return true;
+}
+
 export function isDescendantDuplicate(row: NodeRow, table: NodeTable): boolean {
   let parent = parentRow(row, table);
   while (parent) {
@@ -64,11 +74,12 @@ export function isDescendantDuplicate(row: NodeRow, table: NodeTable): boolean {
 
 export function isInteractive(row: NodeRow, table: NodeTable): boolean {
   if (row.tag === 'option' && isNativeSelectOption(row, table)) return false;
+  if (row.tag === 'option' && !isVisibleListboxOption(row, table)) return false;
   const native = hasNativeInteractiveSemantics(row);
   const candidate =
     native ||
     hasInteractiveRole(row) ||
-    hasEditableSemantics(row) ||
+    isTopmostEditable(row, table) ||
     hasClickableSemantics(row) ||
     hasFocusableSemantics(row);
   if (!candidate) return false;
@@ -90,6 +101,16 @@ function isNativeSelectOption(row: NodeRow, table: NodeTable): boolean {
   let parent = parentRow(row, table);
   while (parent) {
     if (parent.tag === 'select') return true;
+    parent = parentRow(parent, table);
+  }
+  return false;
+}
+
+function isVisibleListboxOption(row: NodeRow, table: NodeTable): boolean {
+  let parent = parentRow(row, table);
+  while (parent) {
+    if (parent.tag === 'select') return false;
+    if (parent.ax?.role === 'listbox' || parent.tag === 'datalist') return true;
     parent = parentRow(parent, table);
   }
   return false;

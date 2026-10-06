@@ -6,6 +6,7 @@ import {
   hasInteractiveRole,
   hasNativeInteractiveSemantics,
   isInteractive,
+  isTopmostEditable,
 } from '@browser-os/dom';
 import { describe, expect, it } from 'vitest';
 
@@ -52,5 +53,50 @@ describe('interactivity rules', () => {
     const child = row({ idx: 2, parentIdx: 1, ax: { role: 'button', name: 'Save', ignored: false, props: {} } });
     expect(isInteractive(parent, table([parent, child]))).toBe(true);
     expect(isInteractive(child, table([parent, child]))).toBe(false);
+  });
+
+  it('keeps only the topmost editable ancestor', () => {
+    const parent = row({ idx: 1, attrs: { contenteditable: 'true' } });
+    const child = row({ idx: 2, parentIdx: 1, attrs: { contenteditable: 'true' } });
+    expect(isTopmostEditable(parent, table([parent, child]))).toBe(true);
+    expect(isTopmostEditable(child, table([parent, child]))).toBe(false);
+    expect(isInteractive(parent, table([parent, child]))).toBe(true);
+    expect(isInteractive(child, table([parent, child]))).toBe(false);
+  });
+
+  it('keeps a checkbox with a different role inside a clickable row', () => {
+    const parent = row({
+      idx: 1,
+      isClickable: true,
+      styles: { cursor: 'pointer' },
+      ax: { role: 'generic', name: 'Subscribe', ignored: false, props: {} },
+    });
+    const child = row({
+      idx: 2,
+      parentIdx: 1,
+      tag: 'input',
+      attrs: { type: 'checkbox' },
+      ax: { role: 'checkbox', name: 'Subscribe', ignored: false, props: {} },
+    });
+    expect(isInteractive(child, table([parent, child]))).toBe(true);
+  });
+
+  it('drops native select options but keeps visible listbox options', () => {
+    const select = row({ idx: 1, tag: 'select' });
+    const nativeOption = row({
+      idx: 2,
+      parentIdx: 1,
+      tag: 'option',
+      ax: { role: 'option', name: 'A', ignored: false, props: {} },
+    });
+    const listbox = row({ idx: 3, ax: { role: 'listbox', name: 'Choices', ignored: false, props: {} } });
+    const listOption = row({
+      idx: 4,
+      parentIdx: 3,
+      tag: 'option',
+      ax: { role: 'option', name: 'B', ignored: false, props: {} },
+    });
+    expect(isInteractive(nativeOption, table([select, nativeOption]))).toBe(false);
+    expect(isInteractive(listOption, table([listbox, listOption]))).toBe(true);
   });
 });
