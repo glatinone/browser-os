@@ -44,7 +44,11 @@ describe('text normalization', () => {
     [['cat', 'cater'], ['cat', 'cattle'], 0.5],
     [['alpha', 'alphabet'], ['alphabet', 'alpha'], 1],
     [['search'], ['searching'], 1],
+    [['sign'], ['signin'], 1],
+    [['signin'], ['sign'], 1],
+    [['abcd'], ['efgh'], 0],
     [['one'], ['two'], 0],
+    [['messages'], ['messages', 'tab'], 0.6666666666666666],
   ])('dice(%j, %j) -> %d', (left, right, expected) => {
     expect(dice(left, right)).toBe(expected);
   });
@@ -86,6 +90,9 @@ describe('parseIntent', () => {
         searchBonus: true,
       },
     ],
+    ['open the messages tab', { tokens: ['messages'], exact: null, roleHints: ['tab'], searchBonus: false }],
+    ['click checkbox', { tokens: [], exact: null, roleHints: ['checkbox'], searchBonus: false }],
+    ['just a regular phrase', { tokens: ['just', 'regular', 'phrase'], exact: null, roleHints: [], searchBonus: false }],
   ])('parses %j', (input, expected) => {
     expect(parseIntent(input)).toEqual(expected);
   });
