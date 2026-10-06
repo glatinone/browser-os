@@ -17,3 +17,4 @@ ignoreWorkspaceCycles: true
 # with a native build are approved by the task that adds them (P2-04, P6-01).
 allowBuilds:
   esbuild: true
+  better-sqlite3: true

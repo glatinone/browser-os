@@ -41,7 +41,7 @@
       }
     },
     {
-      "includes": ["**/fixtures/sites/**"],
+      "includes": ["**/fixtures/sites/**", "**/packages/dom/test/fixtures/**"],
       "formatter": { "enabled": false },
       "linter": { "enabled": false }
     }

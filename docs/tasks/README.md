@@ -43,10 +43,10 @@ Task cards: `phase-XX-*.md` in this folder. Conflicts and questions: `CONFLICTS.
 | P3-06 | Uploads and downloads | P3-01 | cheap | done |
 | P3-07 | **M1** e2e "Hands" | P2-07, P3-02, P3-03, P3-04, P3-05 | cheap | done |
 | **Phase 4** | **DOM intelligence** | | | |
-| P4-01 | Text normalization utilities | P1-04 | cheap | todo |
+| P4-01 | Text normalization utilities | P1-04 | cheap | review |
 | P4-02 | Raw capture + capture recorder script | P2-03, P3-05, P4-01 | review | todo |
 | P4-03 | Join → NodeTable | P4-02 | expert | todo |
-| P4-04 | Interactivity and visibility rules | P4-03 | review | todo |
+| P4-04 | Interactivity and visibility rules | P4-03 | review | review |
 | P4-05 | Semantic output, serialization, goldens | P4-04 | review | todo |
 | P4-06 | Security challenge detection | P4-05 | cheap | todo |
 | P4-07 | Lexical ranking (deterministic tier) | P4-05 | review | todo |

@@ -15,6 +15,7 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
-    "@browser-os/protocol": "workspace:*"
+    "@browser-os/protocol": "workspace:*",
+    "better-sqlite3": "^12.4.1"
   }
 }

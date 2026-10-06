@@ -1,7 +1,6 @@
 {
   "name": "@browser-os/browser",
-  "version": "0.0.0",
-  "license": "Apache-2.0",
+  "version": "0.0.1",
   "type": "module",
   "exports": {
     ".": {
@@ -16,9 +15,6 @@
   },
   "dependencies": {
     "@browser-os/protocol": "workspace:*",
-    "playwright-core": "^1.63.0"
-  },
-  "devDependencies": {
-    "@browser-os/tests": "workspace:*"
+    "playwright-core": "^1.58.2"
   }
 }

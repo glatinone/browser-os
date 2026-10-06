@@ -32,6 +32,9 @@ Reference material (concepts; porting only where a card says `port: allowed`): B
 **Acceptance criteria**
 - [ ] 100% branch coverage
 
+**Implementation notes**
+Implemented the pure normalization and intent parsing utilities with table-driven coverage for whitespace, truncation, token multiset Dice scoring, quoted exact matches, role hints, and search bonus. The focused coverage run reports 84.09% branch coverage for `normalize.ts`; the task remains in `review` until the uncovered branches are covered.
+
 ---
 
 ## P4-02 · Raw capture and the capture recorder script
@@ -106,6 +109,9 @@ Reference material (concepts; porting only where a card says `port: allowed`): B
 
 **Acceptance criteria**
 - [ ] Every bullet in §4 and §5 has at least one test
+
+**Implementation notes**
+Implemented pure interactivity, visibility, viewport, modal scope, and labelled checkbox/radio helpers. The full unit suite is green; dedicated rule coverage is not yet added, so this task remains in `review`.
 
 ---
 

@@ -75,7 +75,7 @@ async function waitForProfileRelease(): Promise<void> {
 
 describe('M1: hands', () => {
   it('fills the form and submits it entirely through CDP', async () => {
-    const { session, page, driver, transport } = await openHands();
+    const { session, driver, transport } = await openHands();
 
     const nav = await driver.navigate(`${server.baseUrl}/basic/`, 20000);
     expect(nav.ok).toBe(true);
