@@ -154,6 +154,8 @@ Semantic output now follows the field rules: role fallback per tag, name fallbac
 
 ## P4-06 · Security challenge detection
 
+**Implementation status:** review. Detection is wired into semantic observations and covers login, MFA/OTP, CAPTCHA, passkey, consent, IdP hosts, visibility filtering, precedence, and false-positive fixtures. Human review of challenge vocabulary and production-site coverage remains before `done`.
+
 | Field | Value |
 |---|---|
 | depends_on | P4-05 |

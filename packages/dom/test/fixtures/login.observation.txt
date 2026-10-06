@@ -1,6 +1,7 @@
 url: http://127.0.0.1/login/
 title: Sign in
 dialogs: none
+challenge: login
 e1 textbox "Username" [form > main]
 e2 textbox "Password" [form > main]
 e3 button "Next" [form > main]

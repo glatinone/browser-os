@@ -8,6 +8,7 @@ import type {
 } from '@browser-os/protocol';
 import { isSensitiveField, MASKED_VALUE, newId } from '@browser-os/protocol';
 import type { RawCapture } from './capture.js';
+import { detectChallenge } from './challenge.js';
 import { isInteractive } from './interactive.js';
 import { joinRawCapture, type NodeRow, type NodeTable, type Rect } from './join.js';
 import { collapse, truncate } from './normalize.js';
@@ -115,7 +116,8 @@ export function buildObservationFromTable(
       (scope.dialogIdx === null || isInside(row, scope.dialogIdx, table)),
   );
   const elements = elementRows.map((row, index) => toSemanticElement(row, index + 1, table, meta.url));
-  const text = meta.includeText ? buildTextBlocks(table, meta.maxTextChars) : [];
+  const fullText = buildTextBlocks(table, meta.maxTextChars);
+  const text = meta.includeText ? fullText : [];
   const frames = table.frames.map(
     (frame, index): FrameInfo => ({
       id: `f${index}`,
@@ -136,7 +138,7 @@ export function buildObservationFromTable(
     elements,
     text,
     dialogs: scope.dialogs,
-    challenge: null,
+    challenge: detectChallenge({ url: meta.url ?? '', title: meta.title ?? '', text: fullText } as Observation, table),
     warnings: [...warnings],
     stats: {
       domNodes: table.rows.length + table.texts.length,
