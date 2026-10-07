@@ -182,3 +182,18 @@ of shipped migration files rather than a hardcoded count.
 4. `prune(olderThanMs)` for both logs.
 
 **Tests:** stats on a synthetic dataset with known answers; prune; audit defensive check.
+
+**Implementation notes**
+`src/stores/run-store.ts` writes one `action_runs` row per action (`insert(ctx, result)`, deriving
+`action_type`/`tier`/`ok`/`error_code`/`llm` fields from `ActionResult` and parking the per-tier
+breakdown in `attempts_json`). `src/stores/audit-store.ts` writes `audit_log` and refuses any
+summary carrying an unmasked string under a `value`/`secret` key, walking nested objects and
+arrays and throwing `INTERNAL` before a row exists; masked, empty, non-string and reference
+values pass. `src/stats.ts` is the §8 metric table: tier distribution (shares over *resolved*
+actions), cache hit rate (hits / actions that consulted the cache tier), false-hit rate
+(cache resolutions that ended in `VERIFICATION_FAILED` or a human correction), LLM calls and
+tokens per action, p50/p95 per tier from `attempts[].ms` (nearest-rank, computed in JS over the
+selected rows), and escalation rate (actions whose attempts span more than one distinct tier).
+`since`/`origin`/`taskKey` filter in SQL (`taskKey` joins `tasks`). Both logs expose
+`prune(olderThanMs)` for the daemon-start retention sweep (memory §3, default 30 days).
+`stats.test.ts` pins every metric against a five-row fixture whose answers were computed by hand.
