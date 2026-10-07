@@ -24,6 +24,14 @@ Runtime dependency added in this phase: `better-sqlite3` (in `packages/memory` o
 
 **Tests:** fresh DB has all tables; reopening doesn't re-run; pragmas set (`PRAGMA journal_mode` = `wal` on a temp file).
 
+**Implementation notes**
+`openStore(path)` in `packages/memory/src/store.ts` loads `better-sqlite3`, sets `foreign_keys`,
+`busy_timeout`, `synchronous`, and WAL for file paths, then runs `runMigrations` from
+`src/migrate.ts`. Migrations stay as `.sql` files under `migrations/` and are read at open time
+(the runner sorts by numeric prefix and records each in `schema_migrations`, so reopening is a
+no-op). `001_init.sql` ships the full schema (profiles, sessions, action_cache, trajectories,
+trajectory_versions, tasks, action_runs, audit_log).
+
 ---
 
 ## P6-02 · Keys and normalization
@@ -42,7 +50,15 @@ Runtime dependency added in this phase: `better-sqlite3` (in `packages/memory` o
 **Tests:** all examples in the spec plus edge cases (root path, encoded segments, param substitution in intent and path, query/hash ignored, truncation).
 
 **Acceptance criteria**
-- [ ] 100% branch coverage
+- [x] 100% branch coverage
+
+**Implementation notes**
+`packages/memory/src/keys.ts` implements §4 exactly: `pathTemplate` masks digits, UUIDs, hex runs
+≥8, alnum segments ≥6, and current param values, caps at 6 segments then `/**`; `normalizeIntent`
+lowercases, substitutes `{param}`, strips punctuation, drops articles a/an/the;
+`cacheKey`/`siteKey` are sha256 over newline-joined parts (siteKey uses the `*` path slot, so
+`siteKey === cacheKey(pathTemplate:'*')`); `urlMatches` accepts exact or `/**` prefix on a
+segment boundary. Tests in `test/keys.test.ts` cover every spec example plus edge cases.
 
 ---
 
@@ -66,6 +82,15 @@ Prepared statements, and JSON columns (de)serialized inside the store.
 
 **Tests:** round trips; unique profile name → `INVALID_REQUEST`; `markAllLiveClosed`.
 
+**Implementation notes**
+`src/stores/profile-store.ts`, `session-store.ts`, `task-store.ts` all map onto the tables that
+`001_init.sql` already defines (no new migrations): profiles generate a UUID id and enforce name
+uniqueness in the store, sessions upsert reactivates a closed row (`closed_at` clears) and
+`markAllLiveClosed` closes everything open for the daemon-start hook, tasks serialize
+`params`/`secret_names`/`stats` into their `*_json` columns inside the store and hydrate on read.
+Generated task ids carry a random suffix so inserts in the same millisecond never collide.
+Tests: `test/profile-store.test.ts`, `test/session-store.test.ts`, `test/task-store.test.ts`.
+
 ---
 
 ## P6-04 · Action cache store
@@ -88,7 +113,16 @@ Prepared statements, and JSON columns (de)serialized inside the store.
 **Tests:** every transition in memory §5; site-key fallback; invalid entries skipped.
 
 **Acceptance criteria**
-- [ ] L10 micro bench (P10-02) target achievable: `get` is one indexed lookup per key
+- [x] L10 micro bench (P10-02) target achievable: `get` is one indexed lookup per key
+
+**Implementation notes**
+`src/stores/action-cache-store.ts` implements the §5 lifecycle. `get` does at most two PRIMARY
+KEY lookups (cacheKey, then the siteKey fallback) and skips `status='invalid'` rows; `put` writes
+both rows with one upsert each and resets counters; `recordHit` bumps hits and zeroes
+`consecutive_misses`; `recordMiss` increments and invalidates at `MISS_LIMIT = 3`;
+`invalidate` retires a row immediately for false hits; `list`/`clear` support `--origin`.
+Tests in `test/action-cache-store.test.ts` cover every transition in §5 including the
+exact→site fallback chain after invalidation.
 
 ---
 

@@ -49,12 +49,12 @@ Task cards: `phase-XX-*.md` in this folder. Conflicts and questions: `CONFLICTS.
 | P4-04 | Interactivity and visibility rules | P4-03 | review | review |
 | P4-05 | Semantic output, serialization, goldens | P4-04 | review | review |
 | P4-06 | Security challenge detection | P4-05 | cheap | review |
-| P4-07 | Lexical ranking (deterministic tier) | P4-05 | review | todo |
-| P4-08 | Locator build, cssPath, matching | P4-05 | expert | todo |
-| P4-09 | Probe (cache fast path) | P4-08, P2-03 | review | todo |
-| P4-10 | Playwright ariaSnapshot oracle test | P4-05 | cheap | todo |
-| P4-11 | Observer (runtime) | P4-06, P4-08, P2-07 | cheap | todo |
-| P4-12 | Mutation fixtures + locator robustness suite | P4-08 | cheap | todo |
+| P4-07 | Lexical ranking (deterministic tier) | P4-05 | review | review |
+| P4-08 | Locator build, cssPath, matching | P4-05 | expert | review |
+| P4-09 | Probe (cache fast path) | P4-08, P2-03 | review | review |
+| P4-10 | Playwright ariaSnapshot oracle test | P4-05 | cheap | done |
+| P4-11 | Observer (runtime) | P4-06, P4-08, P2-07 | cheap | done |
+| P4-12 | Mutation fixtures + locator robustness suite | P4-08 | cheap | done |
 | **Phase 5** | **AI providers** | | | |
 | P5-01 | FakeModelProvider | P1-02 | cheap | todo |
 | P5-02 | OpenAI-compatible provider | P5-01 | cheap | todo |
@@ -62,10 +62,10 @@ Task cards: `phase-XX-*.md` in this folder. Conflicts and questions: `CONFLICTS.
 | P5-04 | Model registry from config | P5-02, P5-03, P1-03 | cheap | todo |
 | P5-05 | Resolve-target prompt + output validation | P5-01 | review | todo |
 | **Phase 6** | **Memory** | | | |
-| P6-01 | Store, migrations, schema 001 | P1-02 | cheap | todo |
-| P6-02 | Keys and normalization | P1-02 | cheap | todo |
-| P6-03 | Profile, session, task stores | P6-01 | cheap | todo |
-| P6-04 | Action cache store | P6-01, P6-02 | cheap | todo |
+| P6-01 | Store, migrations, schema 001 | P1-02 | cheap | done |
+| P6-02 | Keys and normalization | P1-02 | cheap | done |
+| P6-03 | Profile, session, task stores | P6-01 | cheap | done |
+| P6-04 | Action cache store | P6-01, P6-02 | cheap | done |
 | P6-05 | Trajectory store | P6-01 | cheap | todo |
 | P6-06 | Run log, audit log, stats, retention | P6-01 | cheap | todo |
 | **Phase 7** | **Router + tasks → M3** | | | |
