@@ -174,7 +174,7 @@ Semantic output now follows the field rules: role fallback per tag, name fallbac
 - negatives: `basic` → null; a page containing the word "code" in a paragraph → null
 
 **Acceptance criteria**
-- [ ] No false positive on any non-login fixture
+- [x] No false positive on any non-login fixture (`challenge.test.ts` → "has no false positives on non-login fixtures")
 
 ---
 
@@ -308,7 +308,7 @@ Implemented oracle test in `tests/e2e/oracle.e2e.test.ts` pairing observation in
 - [x] Reuse check costs one CDP round trip
 
 **Implementation notes**
-Implemented `Observer` in `packages/runtime/src/observer/observer.ts`. It caches one observation per page, checks the mutation counter before reuse, invalidates on explicit action invalidation and main-frame navigation, keeps the last three observation indices for stale-reference healing, supports `includeText` cache bypass, and emits `observation.captured`. Unit coverage is in `packages/runtime/test/observer.test.ts`.
+Implemented `Observer` in `packages/runtime/src/observer/observer.ts`. It caches one observation per page, checks the mutation counter before reuse, invalidates on explicit action invalidation and main-frame navigation, keeps the last three observation indices for stale-reference healing, supports `includeText` cache bypass, and emits `observation.captured`. Unit coverage is in `packages/runtime/test/observer.test.ts`. `packages/runtime/test/observer.browser.test.ts` covers the same contract against a real Chrome and fixture server: one capture for an unchanged page, object-identical reuse on the second call, a second capture after an actual main-frame navigation to another fixture, exactly two `observation.captured` events, and a re-capture after an explicit `invalidate`.
 
 ---
 
@@ -339,4 +339,18 @@ Implemented `Observer` in `packages/runtime/src/observer/observer.ts`. It caches
 - [x] Suite passes; failures documented as CONFLICTS entries if thresholds look wrong
 
 **Implementation notes**
-Added `packages/dom/test/robustness.test.ts` covering seven positive mutation classes and the removed-target negative case. The suite builds a base locator, evaluates it against mutated observations, requires the target to rank first at or above `0.70` with a `0.10` margin when a runner-up exists, and rejects removed targets below `0.70`. Result: 8/8 tests passed, including the seven positive cases and one negative case.
+Fixture-based, as the card specifies. `fixtures/sites/mutations/base.html` is the reference page
+and each of the 8 cases has its own `fixtures/sites/mutations/<case>/index.html`, each differing
+from the base in exactly one way (class names, sibling order, extra wrappers, badge count,
+react-style `:r9a:` ids, text case, container under the same landmark, and the removed target).
+Raw captures for the base and all 8 cases live in `packages/dom/test/fixtures/mutations/`
+(recorded through `scripts/record-capture.ts`, which now tolerates nested fixture paths and
+`.html` targets and slugs the browser profile name).
+`fixtures/sites/mutations/truth.json` lists the target pairs (role + name in the base capture and
+in the mutated capture) plus `matchAccept: 0.70` and `matchMargin: 0.10` from action-router §2.
+`robustness.test.ts` builds the locator from the *real* base capture and matches it against each
+*real* mutated capture. Measured results: 7/7 positive pairs rank the target first with scores of
+1.000 except `unstable-ids` at 0.770, and margins from 0.345 to 0.575 (all ≥ 0.10); the removed
+target's best candidate scores 0.425, below matchAccept. Note the `badge-count` pair scores 1.000
+rather than exercising dice similarity: `normalizeName` maps digits to `#`, so "Messages 3" and
+"Messages 7" normalize identically by design.

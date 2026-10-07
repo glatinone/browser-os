@@ -1,150 +1,107 @@
-import type { ElementLocator, Observation, ObservationIndex, SemanticElement } from '@browser-os/protocol';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { Observation } from '@browser-os/protocol';
 import { describe, expect, it } from 'vitest';
+import type { RawCapture } from '../src/capture.js';
 import { matchLocator } from '../src/locator.js';
+import { buildObservation } from '../src/semantic.js';
 
-interface Candidate {
-  ref: string;
+const dir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(dir, '..', '..', '..');
+const capturesDir = path.join(dir, 'fixtures', 'mutations');
+
+interface Target {
   role: string;
   name: string;
-  tag?: string;
-  attrs?: ElementLocator['attrs'];
-  context?: string[];
-  cssPath?: string;
-  ordinal?: number;
 }
 
-function locator(candidate: Candidate): ElementLocator {
-  return {
-    v: 1,
-    role: candidate.role,
-    name: candidate.name,
-    nameIsDynamic: false,
-    tag: candidate.tag ?? 'button',
-    attrs: candidate.attrs ?? {},
-    context: candidate.context ?? ['Main'],
-    cssPath: candidate.cssPath ?? 'main > button:nth-of-type(1)',
-    framePath: [],
-    ordinal: candidate.ordinal ?? 0,
-  };
+interface Truth {
+  matchAccept: number;
+  matchMargin: number;
+  cases: Array<{
+    name: string;
+    positive: boolean;
+    base: Target;
+    mutated: Target | null;
+  }>;
 }
 
-function observed(candidates: Candidate[]): { observation: Observation; index: ObservationIndex } {
-  const elements = candidates.map(
-    (candidate): SemanticElement => ({
-      ref: candidate.ref,
-      role: candidate.role,
-      name: candidate.name,
-      tag: candidate.tag ?? 'button',
-      state: {},
-      inViewport: true,
-      rect: { x: 0, y: 0, w: 100, h: 30 },
-      frame: 'f0',
-      context: candidate.context ?? ['Main'],
-    }),
-  );
-  const entries = new Map(
-    candidates.map((candidate) => [
-      candidate.ref,
-      {
-        backendNodeId: 1,
-        frameId: 'f0',
-        cdpFrameId: 'frame',
-        locator: locator(candidate),
-      },
-    ]),
-  );
-  return {
-    observation: {
-      id: 'obs_mutated',
-      sessionId: 'test',
-      pageId: 'test',
-      url: 'https://fixture.test/',
-      title: 'Mutation fixture',
-      capturedAt: 0,
-      frames: [],
-      elements,
-      text: [],
-      dialogs: [],
-      challenge: null,
-      warnings: [],
-      stats: {
-        domNodes: elements.length,
-        axNodes: elements.length,
-        elements: elements.length,
-        captureMs: 0,
-        buildMs: 0,
-        estTokens: 0,
-        large: false,
-      },
-    },
-    index: { observationId: 'obs_mutated', pageId: 'test', entries },
-  };
+const truth = JSON.parse(
+  readFileSync(path.join(repoRoot, 'fixtures', 'sites', 'mutations', 'truth.json'), 'utf8'),
+) as Truth;
+
+function load(capture: string) {
+  const raw = JSON.parse(readFileSync(path.join(capturesDir, capture), 'utf8')) as RawCapture;
+  return buildObservation(raw, {
+    url: 'http://127.0.0.1/mutations/',
+    title: 'Mutation base',
+    sessionId: 'p4-12',
+    pageId: 'p4-12',
+    capturedAt: 12345,
+  });
 }
 
-const BASE: Candidate = {
-  ref: 'e1',
-  role: 'button',
-  name: 'Sign in',
-  attrs: { 'data-testid': 'submit-login', name: 'submit' },
-  context: ['Account', 'Main'],
-  cssPath: 'main > form:nth-of-type(1) > button:nth-of-type(1)',
-};
+function findByRoleName(observation: Observation, target: Target) {
+  return observation.elements.find((el) => el.role === target.role && el.name === target.name);
+}
 
-const POSITIVE_CASES: Array<{ name: string; candidate: Candidate }> = [
-  { name: 'class names changed', candidate: { ...BASE, attrs: { ...BASE.attrs }, cssPath: BASE.cssPath } },
-  {
-    name: 'sibling order reversed',
-    candidate: { ...BASE, cssPath: 'main > form:nth-of-type(1) > button:nth-of-type(2)' },
-  },
-  {
-    name: 'extra wrapper divs',
-    candidate: { ...BASE, cssPath: 'main > div:nth-of-type(1) > form:nth-of-type(1) > button:nth-of-type(1)' },
-  },
-  {
-    name: 'badge count changed',
-    candidate: {
-      ...BASE,
-      name: 'Messages 7',
-      role: 'link',
-      tag: 'a',
-      attrs: { 'data-testid': 'messages-badge' },
-      context: ['Main'],
-    },
-  },
-  {
-    name: 'unstable ids regenerated',
-    candidate: { ...BASE, attrs: { 'data-testid': 'submit-login', name: 'submit' } },
-  },
-  { name: 'button text case changed', candidate: { ...BASE, name: 'Sign In' } },
-  {
-    name: 'element moved within the same landmark',
-    candidate: { ...BASE, cssPath: 'main > section:nth-of-type(2) > button:nth-of-type(1)' },
-  },
-];
+const base = load('base.html.raw.json');
 
-describe('locator robustness under DOM mutations', () => {
-  it.each(POSITIVE_CASES)('keeps the target first with a 0.10 margin when $name', ({ candidate }) => {
-    const source = candidate.name === 'Messages 7' ? locator({ ...candidate, name: 'Messages 3' }) : locator(BASE);
-    const distractor: Candidate = {
-      ref: 'e2',
-      role: 'button',
-      name: 'Cancel',
-      attrs: { name: 'cancel' },
-      context: ['Account', 'Main'],
-    };
-    const { observation, index } = observed([candidate, distractor]);
-    const matches = matchLocator(observation, index, source);
-    expect(matches[0]?.ref).toBe('e1');
-    expect(matches[0]?.score ?? 0).toBeGreaterThanOrEqual(0.7);
-    if (matches.length > 1) expect((matches[0]?.score ?? 0) - (matches[1]?.score ?? 0)).toBeGreaterThanOrEqual(0.1);
+function locatorForBaseTarget(caseName: string, target: Target) {
+  const baseTarget = findByRoleName(base.observation, target);
+  if (!baseTarget) throw new Error(`base target not found for ${caseName}`);
+  const entry = base.index.entries.get(baseTarget.ref);
+  if (!entry) throw new Error(`no index entry for base target in ${caseName}`);
+  return entry.locator;
+}
+
+describe('locator robustness under real DOM mutations (P4-12)', () => {
+  const positives = truth.cases.filter((testCase) => testCase.positive);
+  const negative = truth.cases.find((testCase) => !testCase.positive);
+
+  it('the fixture set matches the card: 7 positive pairs plus 1 negative', () => {
+    expect(truth.cases.length).toBe(8);
+    expect(positives.length).toBe(7);
+    expect(negative).toBeDefined();
+    expect(findByRoleName(base.observation, truth.cases[0].base)).toBeDefined();
   });
 
-  it('does not match a removed target above the acceptance threshold', () => {
-    const { observation, index } = observed([
-      { ref: 'e2', role: 'button', name: 'Create account', attrs: { name: 'register' }, context: ['Account', 'Main'] },
-      { ref: 'e3', role: 'link', name: 'Forgot password', attrs: { href: '/forgot' }, context: ['Account', 'Main'] },
-    ]);
-    const matches = matchLocator(observation, index, locator(BASE));
-    expect(matches[0]?.score ?? 0).toBeLessThan(0.7);
+  for (const testCase of positives) {
+    it(`keeps the target first with margin >= ${truth.matchMargin} when ${testCase.name}`, () => {
+      const locator = locatorForBaseTarget(testCase.name, testCase.base);
+      const mutated = load(`${testCase.name}.raw.json`);
+
+      if (!testCase.mutated) {
+        throw new Error(`${testCase.name} is positive but declares no mutated target`);
+      }
+      const mutatedTarget = findByRoleName(mutated.observation, testCase.mutated);
+      if (!mutatedTarget) throw new Error(`mutated target not found in ${testCase.name}`);
+
+      const matches = matchLocator(mutated.observation, mutated.index, locator);
+      const best = matches[0];
+      expect(best?.ref).toBe(mutatedTarget.ref);
+      expect(best?.score ?? 0).toBeGreaterThanOrEqual(truth.matchAccept);
+
+      if (matches.length > 1) {
+        const runnerUp = matches[1];
+        expect((best?.score ?? 0) - (runnerUp?.score ?? 0)).toBeGreaterThanOrEqual(truth.matchMargin);
+      }
+    });
+  }
+
+  it(`rejects every candidate above ${truth.matchAccept} when the target is removed`, () => {
+    if (!negative) throw new Error('truth.json declares no negative case');
+    const locator = locatorForBaseTarget(negative.name, negative.base);
+    const mutated = load(`${negative.name}.raw.json`);
+
+    // The element really is gone, so the rejection below is meaningful.
+    expect(findByRoleName(mutated.observation, negative.base)).toBeUndefined();
+
+    const matches = matchLocator(mutated.observation, mutated.index, locator);
+    expect(matches.length).toBeGreaterThan(0);
+    for (const match of matches) {
+      expect(match.score).toBeLessThan(truth.matchAccept);
+    }
   });
 });

@@ -1,0 +1,56 @@
+{
+  "$comment": "P4-12 mutation cases. Each case pairs the same logical element as seen in the base capture and in the mutated capture, identified semantically by role+name. `positive: false` means the target is gone, so matching must not accept any candidate above matchAccept.",
+  "base": "mutations/base.html",
+  "matchAccept": 0.7,
+  "matchMargin": 0.1,
+  "cases": [
+    {
+      "name": "class-changed",
+      "positive": true,
+      "base": { "role": "button", "name": "Sign in" },
+      "mutated": { "role": "button", "name": "Sign in" }
+    },
+    {
+      "name": "sibling-reversed",
+      "positive": true,
+      "base": { "role": "button", "name": "Sign in" },
+      "mutated": { "role": "button", "name": "Sign in" }
+    },
+    {
+      "name": "wrappers",
+      "positive": true,
+      "base": { "role": "button", "name": "Sign in" },
+      "mutated": { "role": "button", "name": "Sign in" }
+    },
+    {
+      "name": "badge-count",
+      "positive": true,
+      "base": { "role": "link", "name": "Messages 3" },
+      "mutated": { "role": "link", "name": "Messages 7" }
+    },
+    {
+      "name": "unstable-ids",
+      "positive": true,
+      "base": { "role": "button", "name": "Sign in" },
+      "mutated": { "role": "button", "name": "Sign in" }
+    },
+    {
+      "name": "text-case",
+      "positive": true,
+      "base": { "role": "button", "name": "Sign in" },
+      "mutated": { "role": "button", "name": "Sign In" }
+    },
+    {
+      "name": "moved-container",
+      "positive": true,
+      "base": { "role": "button", "name": "Sign in" },
+      "mutated": { "role": "button", "name": "Sign in" }
+    },
+    {
+      "name": "target-removed",
+      "positive": false,
+      "base": { "role": "button", "name": "Sign in" },
+      "mutated": null
+    }
+  ]
+}

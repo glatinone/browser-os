@@ -86,6 +86,9 @@ async function writeTruthMap(
     }
   }
   const outputDir = path.join(repoRoot, 'packages', 'dom', 'test', 'fixtures');
+  await mkdir(path.dirname(path.join(outputDir, `${name}${suffix}.truth-map.json`)), {
+    recursive: true,
+  });
   await writeFile(path.join(outputDir, `${name}${suffix}.truth-map.json`), `${JSON.stringify(map, null, 2)}\n`);
   console.log(
     `truth-map ${name}${suffix}: ${Object.values(map).filter((v) => v !== null).length}/${Object.keys(map).length} selectors mapped`,
@@ -93,24 +96,33 @@ async function writeTruthMap(
 }
 
 await withFixtureServer(async (server) => {
-  const browser = await launchTestBrowser({ name: `capture-${fixtureName}`, channel: 'chrome' });
+  // Fixture names may be nested paths ("mutations/base.html"), which are not
+  // legal profile names: flatten them to a valid, length-bounded slug.
+  const profileName = `capture-${fixtureName}`
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .slice(0, 31)
+    .replace(/-$/, '');
+  const browser = await launchTestBrowser({ name: profileName, channel: 'chrome' });
   try {
     const page = browser.handle().pages()[0];
     const driver = page.driver();
-    const navigation = await driver.navigate(`${server.baseUrl}/${fixtureName}/`, 20_000);
+    const navigation = await driver.navigate(
+      `${server.baseUrl}/${fixtureName.endsWith('.html') ? fixtureName : `${fixtureName}/`}`,
+      20_000,
+    );
     if (!navigation.ok) throw new Error(`fixture navigation failed: ${navigation.error?.message ?? 'unknown error'}`);
     await driver.settle(100, 5_000);
     const cdp = await page.cdp();
     const raw = await captureRaw(cdp);
     const outputDir = path.join(repoRoot, 'packages', 'dom', 'test', 'fixtures');
-    await mkdir(outputDir, { recursive: true });
     const suffix = variant ? `.${variant}` : '';
+    const rawPath = path.join(outputDir, `${fixtureName}${suffix}.raw.json`);
+    await mkdir(path.dirname(rawPath), { recursive: true });
     const pageWithCdp = { cdp: () => cdp };
     await writeTruthMap(server, pageWithCdp, fixtureName, suffix);
-    await writeFile(
-      path.join(outputDir, `${fixtureName}${suffix}.raw.json`),
-      `${JSON.stringify({ _chromeVersion: null, ...raw }, null, 2)}\n`,
-    );
+    await writeFile(rawPath, `${JSON.stringify({ _chromeVersion: null, ...raw }, null, 2)}\n`);
     console.log(`recorded ${fixtureName}${suffix}.raw.json`);
   } finally {
     await browser.dispose();
