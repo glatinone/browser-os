@@ -105,7 +105,7 @@ Phase 7 work proceeds in parallel: these six are inputs Phase 7 reads but does n
 | P6-05 | Trajectory store | P6-01 | cheap | done |
 | P6-06 | Run log, audit log, stats, retention | P6-01 | cheap | done |
 | **Phase 7** | **Router + tasks → M3** | | | |
-| P7-01 | Execution context, budgets, secrets, stub gates | P1-04, P6-01 | cheap | todo |
+|| P7-01 | Execution context, budgets, secrets, stub gates | P1-04, P6-01 | cheap | done |
 | P7-02 | Router core | P7-01, P3-03, P3-04, P3-05, P4-11, P6-06 | expert | todo |
 | P7-03 | Intent tiers: cache, deterministic, learning | P7-02, P4-07, P4-09, P6-04 | expert | todo |
 | P7-04 | LLM tier and human hook | P7-03, P5-05 | review | todo |

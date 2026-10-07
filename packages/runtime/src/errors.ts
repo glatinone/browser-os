@@ -1,0 +1,1 @@
+export { BosError, type ErrorCode, type BosErrorOptions, type BosErrorJson, isBosError, RETRYABLE_BY_DEFAULT, ERROR_CODES } from '@browser-os/protocol';

@@ -1,4 +1,4 @@
-import type { HumanAnswer, PermissionDecision, PermissionRequest, Policy, RiskLevel } from '@browser-os/protocol';
+import type { HumanAnswer, PermissionDecision, PermissionRequest, Policy } from '@browser-os/protocol';
 import type { HumanGate, PermissionGate, RiskClassifier, RiskResult } from './interfaces.js';
 
 /**
