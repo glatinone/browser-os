@@ -1,6 +1,7 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { openStore } from '../src/store.js';
 
@@ -9,8 +10,13 @@ afterEach(() => {
   for (const store of stores.splice(0)) store.close();
 });
 
+/** Shipped migration files, so the assertion tracks the package rather than a number. */
+const migrationsDir = fileURLToPath(new URL('../migrations', import.meta.url));
+const shipped = readdirSync(migrationsDir).filter((file) => /^\d+_.*\.sql$/.test(file)).length;
+
 describe('memory store', () => {
-  it('opens, applies migration 001, and is idempotent', () => {
+  it('opens, applies every shipped migration, and is idempotent', () => {
+    expect(shipped).toBeGreaterThan(0);
     const store = openStore(':memory:');
     stores.push(store);
     const tables = (
@@ -28,7 +34,9 @@ describe('memory store', () => {
         'audit_log',
       ]),
     );
-    expect(store.db.prepare('SELECT COUNT(*) AS count FROM schema_migrations').get()).toEqual({ count: 1 });
+    expect(store.db.prepare('SELECT COUNT(*) AS count FROM schema_migrations').get()).toEqual({
+      count: shipped,
+    });
   });
 
   it('uses WAL for file-backed stores', () => {
@@ -39,6 +47,9 @@ describe('memory store', () => {
     store.close();
     const reopened = openStore(path);
     stores.push(reopened);
-    expect(reopened.db.prepare('SELECT COUNT(*) AS count FROM schema_migrations').get()).toEqual({ count: 1 });
+    // Reopening must not re-run anything.
+    expect(reopened.db.prepare('SELECT COUNT(*) AS count FROM schema_migrations').get()).toEqual({
+      count: shipped,
+    });
   });
 });

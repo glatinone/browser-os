@@ -66,7 +66,7 @@ Task cards: `phase-XX-*.md` in this folder. Conflicts and questions: `CONFLICTS.
 | P6-02 | Keys and normalization | P1-02 | cheap | done |
 | P6-03 | Profile, session, task stores | P6-01 | cheap | done |
 | P6-04 | Action cache store | P6-01, P6-02 | cheap | done |
-| P6-05 | Trajectory store | P6-01 | cheap | todo |
+| P6-05 | Trajectory store | P6-01 | cheap | done |
 | P6-06 | Run log, audit log, stats, retention | P6-01 | cheap | todo |
 | **Phase 7** | **Router + tasks → M3** | | | |
 | P7-01 | Execution context, budgets, secrets, stub gates | P1-04, P6-01 | cheap | todo |

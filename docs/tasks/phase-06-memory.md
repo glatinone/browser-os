@@ -145,6 +145,23 @@ exact→site fallback chain after invalidation.
 
 **Tests:** live-key uniqueness; success/failure/heal transitions; suspect → invalid after 2 consecutive failures; version history; export/import round trip.
 
+**Implementation notes**
+`src/stores/trajectory-store.ts` reads and writes the `trajectories` / `trajectory_versions` pair.
+`getLive` matches `status != 'invalid'` (the partial unique index on `task_key` guarantees at most
+one live row per key), and `createRecorded` rejects a key that still has one with
+`INVALID_REQUEST` while leaving earlier `invalid` rows as history. `recordRun` applies §6.2 in a
+single transaction: success bumps counters, zeroes `consecutive_failures`, restores `active`, and
+folds `healed` locators into `steps_json` with `version++` plus a `healed` versions row; failure
+moves the trajectory to `suspect` after 1 and `invalid` after 2. `invalidate` is the
+TaskManager's pre-replacement hook (integration §10); `delete` removes rows *and* their version
+history inside one transaction, because `foreign_keys = ON` would otherwise reject it.
+`exportJson` returns the `Trajectory` as JSON (secret *names* only, safe by construction) and
+`importJson` validates against `TrajectorySchema`, then lands a fresh version 1 `active` row
+(reusing the exported id when it is free, so copies between databases never collide).
+**Migration 002** adds `trajectories.start_url`: the `Trajectory.startUrl` field the replayer
+needs (integration §10) postdates schema 001, and `store.test.ts` now asserts against the number
+of shipped migration files rather than a hardcoded count.
+
 ---
 
 ## P6-06 · Run log, audit log, stats, retention
