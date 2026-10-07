@@ -12,6 +12,42 @@ Task cards: `phase-XX-*.md` in this folder. Conflicts and questions: `CONFLICTS.
 
 ---
 
+## Review disposition (2026-10-07)
+
+Phase 4 and Phase 5 shipped with 11 tasks in `review`. The owner stated he cannot review this
+material himself, so the disposition was decided with Jev (`typesafe/jev-1.13`), asking one
+choice question over the five candidate paths and one yes/no on whether a high-capability model
+can stand in as reviewer.
+
+Result: `mechanical_only_then_parallel` **0.55**, `delegate_expert_review` 0.45,
+`promote_all_now` 0, `block_on_human` 0, `drop_review_gate` 0 (confidence 0.44). The follow-up
+"high-capability reviewer satisfies the rule for expert tasks" scored **0.49** — not established,
+which is why no expert-labeled task was promoted.
+
+The rule applied: **a task moves to `done` only when its acceptance criterion is itself a passing
+assertion.**
+
+| Promoted to `done` | AC is a passing test assertion |
+|---|---|
+| P4-04 | every §4/§5 bullet has a test |
+| P4-06 | no false positive on non-login fixtures |
+| P4-07 | ≥ 99% precision at 0.75 / 0.15 |
+| P4-09 | probe round-trip budget assertions |
+| P5-05 | prompt carries the untrusted-data framing sentence |
+
+| Stays in `review` | Why the decision keeps it there |
+|---|---|
+| P4-02 | provenance — predates this session, no `port: allowed`, `THIRD_PARTY_NOTICES.md` reads "None yet" |
+| P4-03 | supervision `expert` **and** provenance |
+| P4-05 | judgment — 12 goldens define later phases; card requires human/expert review |
+| P4-08 | supervision `expert` |
+| P5-01 | AC needs Phase 7 router tests, which do not exist yet |
+| P5-02 | AC needs a manual Ollama run; not installed here |
+
+Phase 7 work proceeds in parallel: these six are inputs Phase 7 reads but does not modify.
+
+---
+
 ## Status table
 
 | ID | Title | Depends on | Supervision | Status |
@@ -46,12 +82,12 @@ Task cards: `phase-XX-*.md` in this folder. Conflicts and questions: `CONFLICTS.
 | P4-01 | Text normalization utilities | P1-04 | cheap | done |
 | P4-02 | Raw capture + capture recorder script | P2-03, P3-05, P4-01 | review | review |
 | P4-03 | Join → NodeTable | P4-02 | expert | review |
-| P4-04 | Interactivity and visibility rules | P4-03 | review | review |
+| P4-04 | Interactivity and visibility rules | P4-03 | review | done |
 | P4-05 | Semantic output, serialization, goldens | P4-04 | review | review |
-| P4-06 | Security challenge detection | P4-05 | cheap | review |
-| P4-07 | Lexical ranking (deterministic tier) | P4-05 | review | review |
+| P4-06 | Security challenge detection | P4-05 | cheap | done |
+| P4-07 | Lexical ranking (deterministic tier) | P4-05 | review | done |
 | P4-08 | Locator build, cssPath, matching | P4-05 | expert | review |
-| P4-09 | Probe (cache fast path) | P4-08, P2-03 | review | review |
+| P4-09 | Probe (cache fast path) | P4-08, P2-03 | review | done |
 | P4-10 | Playwright ariaSnapshot oracle test | P4-05 | cheap | done |
 | P4-11 | Observer (runtime) | P4-06, P4-08, P2-07 | cheap | done |
 | P4-12 | Mutation fixtures + locator robustness suite | P4-08 | cheap | done |
@@ -60,7 +96,7 @@ Task cards: `phase-XX-*.md` in this folder. Conflicts and questions: `CONFLICTS.
 | P5-02 | OpenAI-compatible provider | P5-01 | cheap | review |
 | P5-03 | Anthropic provider | P5-02 | cheap | done |
 | P5-04 | Model registry from config | P5-02, P5-03, P1-03 | cheap | done |
-| P5-05 | Resolve-target prompt + output validation | P5-01 | review | review |
+| P5-05 | Resolve-target prompt + output validation | P5-01 | review | done |
 | **Phase 6** | **Memory** | | | |
 | P6-01 | Store, migrations, schema 001 | P1-02 | cheap | done |
 | P6-02 | Keys and normalization | P1-02 | cheap | done |
