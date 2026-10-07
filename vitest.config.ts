@@ -24,6 +24,7 @@ export default defineConfig({
           include: ['packages/*/test/**/*.browser.test.ts'],
           pool: 'forks',
           maxWorkers: 2,
+          sequence: { groupOrder: 2 },
           testTimeout: 30000,
           retry: 1,
         },

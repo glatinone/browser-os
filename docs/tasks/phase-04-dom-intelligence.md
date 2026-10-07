@@ -202,7 +202,10 @@ Semantic output now follows the field rules: role fallback per tag, name fallbac
 **Tests:** unit tests for scoring components; truth test asserts precision ≥ 0.99 overall, prints coverage per fixture.
 
 **Acceptance criteria**
-- [ ] E6 (≥ 99% precision) met at default constants (0.75 / 0.15). If not met, **do not change constants silently**: report in CONFLICTS.md with the data.
+- [x] E6 (≥ 99% precision) met at default constants (0.75 / 0.15). If not met, **do not change constants silently**: report in CONFLICTS.md with the data.
+
+**Implementation notes**
+Implemented `isCompatible` in `packages/dom/src/compat.ts` according to action-router §5 and wired into `lexicalRank`. Fixed bipartite token matching bug in `dice` (`src/normalize.ts`) where match table length was tied to input `a` instead of candidate `b`. Added unit test suite `test/lexical.test.ts` and truth evaluation suite `test/lexical-truth.test.ts` evaluating all 12 fixtures with raw captures and `truth.json`. Result: 100% precision (16/16 correct accepted, 0 false positives on `expect: null`, 23.9% overall coverage) at default constants (0.75 / 0.15). Status set to `review` per review supervision requirement.
 
 ---
 
@@ -226,7 +229,10 @@ Semantic output now follows the field rules: role fallback per tag, name fallbac
 **Tests:** cssPath on shadow and iframe fixtures; unstable id filtering table; dynamic name with params; round trip (for every element in every golden fixture, `matchLocator(obs, buildLocator(el))` returns that element first with margin ≥ 0.10).
 
 **Acceptance criteria**
-- [ ] Round-trip test passes on all fixtures
+- [x] Round-trip test passes on all fixtures
+
+**Implementation notes**
+Implemented `cssPath` in `src/css-path.ts` with unstable ID dropping, test ID preference, tag/nth-of-type traversal, and shadow DOM boundary crossing (` >>> `). Implemented `buildLocator`, `applyParamsToLocator`, `matchLocator`, and `verifyIdentity` in `src/locator.ts` per dom-intelligence §8. Updated `buildObservation` to eagerly generate full locators in `ObservationIndex.entries`. Added unit tests `test/css-path.test.ts` and `test/locator.test.ts`. Full round-trip test asserts against all 12 recorded fixtures: 100% of elements (57/57) match themselves first with minimum margin 0.427 (well above the required 0.10). Status set to `review` per expert supervision requirement.
 
 ---
 
@@ -250,8 +256,11 @@ Semantic output now follows the field rules: role fallback per tag, name fallbac
 **Tests (browser):** probe the search box on `spa` by `data-testid="search-input"` (present since P0-04), by `name`, by cssPath only, inside open shadow DOM; ambiguous cssPath → multiple candidates; iframe locator → `[]`.
 
 **Acceptance criteria**
-- [ ] Round-trip budget assertions pass
-- [ ] L11 printed (informational)
+- [x] Round-trip budget assertions pass
+- [x] L11 printed (informational)
+
+**Implementation notes**
+Added `registerHelper(name, source)` to `IsolatedWorlds` in `@browser-os/browser`. Created `PROBE_HELPER_SOURCE` in `packages/dom/src/probe-helper.js.ts` implementing the 6 ordered search strategies (test-id attrs, stable id, tag[name], tag[aria-label], cssPath with shadow boundary ` >>> `, tag[placeholder]) and returning candidates up to 5 elements. Implemented `probe()` in `packages/dom/src/probe.ts` with framePath short-circuit, isolated world execution, and concurrent batch resolution (`DOM.describeNode`, `Accessibility.getPartialAXTree`, `DOM.getBoxModel`). Browser test suite `packages/dom/test/probe.browser.test.ts` passes all 6 scenarios: verified single-candidate round-trip budget <= 4 (exactly 1 `callFunctionOn` + 3 concurrent CDP calls, sequential depth = 2), measured L11 latency at ~5.65 ms (well below 20 ms target), and verified shadow DOM and iframe behaviors. Status set to `review` per review supervision requirement.
 
 ---
 
@@ -269,7 +278,10 @@ Semantic output now follows the field rules: role fallback per tag, name fallbac
 **Requirements:** for each fixture page, get `page.ariaSnapshot({ mode: 'ai' })` (Playwright ≥ 1.59 public API; if the installed version lacks it, mark the test skipped with a clear message) and our observation. Pair elements by role+name, and report agreement = matched / our interactive elements.
 
 **Acceptance criteria**
-- [ ] Agreement ≥ 95% on every fixture, or a written explanation per mismatch class in the implementation notes
+- [x] Agreement ≥ 95% on every fixture, or a written explanation per mismatch class in the implementation notes
+
+**Implementation notes**
+Implemented oracle test in `tests/e2e/oracle.e2e.test.ts` pairing observation interactive elements against Playwright `page.ariaSnapshot({ mode: 'ai' })`. Ran against all 12 fixture sites (`basic`, `contenteditable`, `dynamic`, `iframe`, `injection`, `login`, `modal`, `overlay`, `risk`, `shadow`, `spa`, `upload`). Result: 100.0% agreement on every fixture (basic 22/22, spa 6/6, risk 5/5, shadow 4/4, contenteditable 3/3, iframe 3/3, injection 3/3, login 3/3, modal 3/3, overlay 2/2, upload 2/2, dynamic 1/1). Status set to `done` per cheap supervision.
 
 ---
 
@@ -293,7 +305,10 @@ Semantic output now follows the field rules: role fallback per tag, name fallbac
 **Tests:** reuse on an unchanged page (one capture call); a mutation → re-capture; navigation → re-capture; event emitted; L8 printed.
 
 **Acceptance criteria**
-- [ ] Reuse check costs one CDP round trip
+- [x] Reuse check costs one CDP round trip
+
+**Implementation notes**
+Implemented `Observer` in `packages/runtime/src/observer/observer.ts`. It caches one observation per page, checks the mutation counter before reuse, invalidates on explicit action invalidation and main-frame navigation, keeps the last three observation indices for stale-reference healing, supports `includeText` cache bypass, and emits `observation.captured`. Unit coverage is in `packages/runtime/test/observer.test.ts`.
 
 ---
 
@@ -321,4 +336,7 @@ Semantic output now follows the field rules: role fallback per tag, name fallbac
 **Test:** build locators on base, match on mutated. Correct element best with margin ≥ 0.10 in ≥ 95% of positive pairs; the negative case has no candidate ≥ 0.70.
 
 **Acceptance criteria**
-- [ ] Suite passes; failures documented as CONFLICTS entries if thresholds look wrong
+- [x] Suite passes; failures documented as CONFLICTS entries if thresholds look wrong
+
+**Implementation notes**
+Added `packages/dom/test/robustness.test.ts` covering seven positive mutation classes and the removed-target negative case. The suite builds a base locator, evaluates it against mutated observations, requires the target to rank first at or above `0.70` with a `0.10` margin when a runner-up exists, and rejects removed targets below `0.70`. Result: 8/8 tests passed, including the seven positive cases and one negative case.

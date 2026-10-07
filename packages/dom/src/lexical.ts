@@ -1,4 +1,5 @@
-import type { SemanticElement } from '@browser-os/protocol';
+import type { ActionType, SemanticElement } from '@browser-os/protocol';
+import { isCompatible } from './compat.js';
 import { dice, normalizeName, parseIntent, tokenize } from './normalize.js';
 
 export interface RankedElement {
@@ -14,10 +15,15 @@ export interface LexicalFailure {
   reason: 'TARGET_NOT_FOUND' | 'TARGET_AMBIGUOUS';
 }
 
-export function lexicalRank(elements: SemanticElement[], intent: string, _actionType?: string): RankedElement[] {
+export function lexicalRank(
+  elements: SemanticElement[],
+  intent: string,
+  actionType?: ActionType | string,
+): RankedElement[] {
+  const filtered = actionType ? elements.filter((el) => isCompatible(el, actionType)) : elements;
   const parsed = parseIntent(intent);
   const intentTokens = parsed.tokens;
-  return elements
+  return filtered
     .map((element, index) => ({ element, score: scoreElement(element, parsed, intentTokens), index }))
     .sort((a, b) => b.score - a.score || a.index - b.index)
     .map(({ element, score }) => ({ element, score }));

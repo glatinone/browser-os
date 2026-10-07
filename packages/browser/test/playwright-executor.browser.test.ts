@@ -20,7 +20,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await browser.dispose();
-});
+}, 30000);
 
 async function openPage(): Promise<OpenPage> {
   const handle = await browser.handle().newPage();

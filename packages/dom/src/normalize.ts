@@ -108,7 +108,7 @@ export function dice(a: string[], b: string[]): number {
   if (a.length === 0 && b.length === 0) return 1;
   if (a.length === 0 || b.length === 0) return 0;
 
-  const matches = new Array<number>(a.length).fill(-1);
+  const matches = new Array<number>(b.length).fill(-1);
   const visit = (left: number, seen: Set<number>): boolean => {
     const leftToken = a[left] as string;
     for (let right = 0; right < b.length; right += 1) {

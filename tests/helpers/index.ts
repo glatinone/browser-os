@@ -55,4 +55,5 @@ export function dummyProfile(name = 'test'): BrowserProfile {
   };
 }
 
+export { CountingCdpTransport, IsolatedWorlds } from '@browser-os/browser';
 export * from './launch-test-browser.js';

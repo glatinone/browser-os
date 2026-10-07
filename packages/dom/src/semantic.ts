@@ -1,6 +1,7 @@
 import type {
   ElementState,
   FrameInfo,
+  IndexEntry,
   Observation,
   ObservationIndex,
   SemanticElement,
@@ -11,6 +12,7 @@ import type { RawCapture } from './capture.js';
 import { detectChallenge } from './challenge.js';
 import { isInteractive } from './interactive.js';
 import { joinRawCapture, type NodeRow, type NodeTable, type Rect } from './join.js';
+import { buildLocator } from './locator.js';
 import { collapse, truncate } from './normalize.js';
 import { estimateTokens, serializeLines } from './serialize.js';
 import { effectiveRect, inViewport, isVisible, modalScope } from './visibility.js';
@@ -151,26 +153,7 @@ export function buildObservationFromTable(
     },
   };
   observation.stats.estTokens = estimateTokens(serializeLines(observation));
-  const entries = new Map<
-    string,
-    {
-      backendNodeId: number;
-      frameId: string;
-      cdpFrameId: string;
-      locator: {
-        v: 1;
-        role: string;
-        name: string;
-        nameIsDynamic: false;
-        tag: string;
-        attrs: Record<string, never>;
-        context: string[];
-        cssPath: string;
-        framePath: string[];
-        ordinal: number;
-      };
-    }
-  >();
+  const entries = new Map<string, IndexEntry>();
   elements.forEach((element) => {
     const row = elementRows[Number(element.ref.slice(1)) - 1];
     if (row)
@@ -178,18 +161,7 @@ export function buildObservationFromTable(
         backendNodeId: row.backendNodeId,
         frameId: element.frame,
         cdpFrameId: row.frameId,
-        locator: {
-          v: 1,
-          role: element.role,
-          name: element.name,
-          nameIsDynamic: false,
-          tag: element.tag,
-          attrs: {},
-          context: element.context,
-          cssPath: '',
-          framePath: [],
-          ordinal: 0,
-        },
+        locator: buildLocator(table, row.idx, element, observation),
       });
   });
   return { observation, index: { observationId: id, pageId: meta.pageId ?? '', entries } };

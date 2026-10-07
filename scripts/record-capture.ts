@@ -27,26 +27,62 @@ async function writeTruthMap(
   }
   if (intents.length === 0) return;
   const cdp = page.cdp() as { send(method: string, params?: unknown): Promise<Record<string, unknown>> };
-  const doc = await cdp.send('DOM.getDocument', { depth: 0 });
-  const rootNodeId = (doc.root as { nodeId?: number } | undefined)?.nodeId;
+  const doc = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
+  function collectDocNodeIds(node: unknown, list: number[] = []): number[] {
+    if (!node || typeof node !== 'object') return list;
+    const n = node as {
+      nodeId?: number;
+      nodeType?: number;
+      children?: unknown[];
+      contentDocument?: unknown;
+      shadowRoots?: unknown[];
+    };
+    if (typeof n.nodeId === 'number' && (n.nodeType === 9 || n.nodeType === 11)) {
+      list.push(n.nodeId);
+    }
+    if (n.contentDocument) collectDocNodeIds(n.contentDocument, list);
+    if (Array.isArray(n.children)) {
+      for (const child of n.children) collectDocNodeIds(child, list);
+    }
+    if (Array.isArray(n.shadowRoots)) {
+      for (const sr of n.shadowRoots) collectDocNodeIds(sr, list);
+    }
+    return list;
+  }
+  const rootNode = doc.root as { nodeId?: number } | undefined;
+  const docNodeIds = collectDocNodeIds(doc.root);
+  if (rootNode?.nodeId !== undefined && !docNodeIds.includes(rootNode.nodeId)) {
+    docNodeIds.unshift(rootNode.nodeId);
+  }
   const map: Record<string, number | null> = {};
   for (const entry of intents) {
     const css = entry.expect?.css;
-    if (!css || rootNodeId === undefined) {
+    if (!css || docNodeIds.length === 0) {
       if (css) map[css] = null;
       continue;
     }
-    try {
-      const query = await cdp.send('DOM.querySelector', { nodeId: rootNodeId, selector: css });
-      const nodeId = (query.nodeId as number | undefined) ?? 0;
-      if (nodeId === 0) {
-        map[css] = null;
-      } else {
-        const desc = await cdp.send('DOM.describeNode', { nodeId });
-        map[css] = (desc.node as { backendNodeId?: number } | undefined)?.backendNodeId ?? null;
+    let foundNodeId = 0;
+    for (const docId of docNodeIds) {
+      try {
+        const query = await cdp.send('DOM.querySelector', { nodeId: docId, selector: css });
+        const nid = (query.nodeId as number | undefined) ?? 0;
+        if (nid !== 0) {
+          foundNodeId = nid;
+          break;
+        }
+      } catch {
+        // continue trying other documents
       }
-    } catch {
+    }
+    if (foundNodeId === 0) {
       map[css] = null;
+    } else {
+      try {
+        const desc = await cdp.send('DOM.describeNode', { nodeId: foundNodeId });
+        map[css] = (desc.node as { backendNodeId?: number } | undefined)?.backendNodeId ?? null;
+      } catch {
+        map[css] = null;
+      }
     }
   }
   const outputDir = path.join(repoRoot, 'packages', 'dom', 'test', 'fixtures');

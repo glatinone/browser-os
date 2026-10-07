@@ -22,6 +22,7 @@ export class IsolatedWorlds {
   private readonly transport: CdpTransport;
   private readonly contexts = new Map<string, number>();
   private readonly pending = new Map<string, Promise<number>>();
+  private readonly helpers = new Map<string, string>();
 
   constructor(transport: CdpTransport) {
     this.transport = transport;
@@ -34,6 +35,20 @@ export class IsolatedWorlds {
         this.pending.delete(frameId);
       }
     });
+  }
+
+  /** Registers a helper source to be evaluated into isolated worlds. */
+  registerHelper(name: string, source: string): void {
+    this.helpers.set(name, source);
+    for (const contextId of this.contexts.values()) {
+      this.transport
+        .send('Runtime.evaluate', {
+          expression: source,
+          contextId,
+          returnByValue: false,
+        })
+        .catch(() => {});
+    }
   }
 
   /** The `executionContextId` of world `bos` in `frameId`, creating it if needed. */
@@ -99,6 +114,14 @@ export class IsolatedWorlds {
         contextId,
         returnByValue: false,
       });
+
+      for (const source of this.helpers.values()) {
+        await this.transport.send('Runtime.evaluate', {
+          expression: source,
+          contextId,
+          returnByValue: false,
+        });
+      }
       this.contexts.set(frameId, contextId);
       return contextId;
     } finally {

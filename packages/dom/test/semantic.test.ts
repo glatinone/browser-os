@@ -178,7 +178,15 @@ describe('semantic observation goldens', () => {
     expect(entry).toMatchObject({
       backendNodeId: expect.any(Number),
       frameId: 'f0',
-      locator: { v: 1, role: 'button', name: 'Top', nameIsDynamic: false, tag: 'button', cssPath: '', ordinal: 0 },
+      locator: {
+        v: 1,
+        role: 'button',
+        name: 'Top',
+        nameIsDynamic: false,
+        tag: 'button',
+        cssPath: 'button:nth-of-type(1)',
+        ordinal: 0,
+      },
     });
     const all = serializeLines(observation);
     const visibleOnly = serializeLines(observation, { viewportOnly: true });

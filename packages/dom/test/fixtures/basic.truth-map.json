@@ -1,0 +1,12 @@
+{
+  "#name": 3,
+  "#email": 4,
+  "#country": 5,
+  "#newsletter": 9,
+  "#terms": 10,
+  "input[name=plan][value=yearly]": 8,
+  "#notes": 6,
+  "button[type=submit]": 123,
+  "button[aria-label=Settings]": 63,
+  "a[href='/basic/docs']": 37
+}
