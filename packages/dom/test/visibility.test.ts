@@ -81,4 +81,36 @@ describe('visibility rules', () => {
     expect(visibleRect(hidden, table(rows))).toBeNull();
     expect(visibleRect(collapsed, table(rows))).toBeNull();
   });
+
+  it('rejects opacity 0 unless the row is a labeled control', () => {
+    const faded = row({ idx: 1, styles: { opacity: '0' } });
+    expect(isVisible(faded, table([faded]))).toBe(false);
+    expect(visibleRect(faded, table([faded]))).toBeNull();
+  });
+
+  it('treats aria-modal="true" as a dialog, and an alertdialog with props.modal as one', () => {
+    const viaAttribute = row({
+      idx: 1,
+      paintOrder: 1,
+      attrs: { 'aria-modal': 'true' },
+      ax: { role: 'dialog', name: 'Confirm', ignored: false, props: {} },
+    });
+    expect(modalScope(table([viaAttribute]))).toEqual({ dialogIdx: 1, dialogs: ['Confirm'] });
+
+    const alert = row({
+      idx: 2,
+      paintOrder: 2,
+      ax: { role: 'alertdialog', name: 'Delete everything', ignored: false, props: { modal: true } },
+    });
+    expect(modalScope(table([alert]))).toEqual({ dialogIdx: 2, dialogs: ['Delete everything'] });
+  });
+
+  it('ignores a non-modal dialog', () => {
+    const drawer = row({
+      idx: 1,
+      paintOrder: 1,
+      ax: { role: 'dialog', name: 'Filters', ignored: false, props: { modal: false } },
+    });
+    expect(modalScope(table([drawer]))).toEqual({ dialogIdx: null, dialogs: [] });
+  });
 });

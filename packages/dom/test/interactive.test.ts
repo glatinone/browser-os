@@ -99,4 +99,22 @@ describe('interactivity rules', () => {
     expect(isInteractive(nativeOption, table([select, nativeOption]))).toBe(false);
     expect(isInteractive(listOption, table([listbox, listOption]))).toBe(true);
   });
+
+  it('drops an ignored row unless rule 1 or rule 3 rescues it', () => {
+    // No rescue: `ax.ignored` with no native tag and no editable ancestor.
+    const ignored = row({ idx: 1, ax: { role: 'button', name: 'Ghost', ignored: true, props: {} } });
+    expect(isInteractive(ignored, table([ignored]))).toBe(false);
+
+    // Rule 1 rescues a native button even when the AX node says ignored.
+    const native = row({ idx: 2, tag: 'button', ax: { role: 'button', name: 'Save', ignored: true, props: {} } });
+    expect(isInteractive(native, table([native]))).toBe(true);
+
+    // Rule 3 rescues a contenteditable even when the AX node says ignored.
+    const editable = row({
+      idx: 3,
+      attrs: { contenteditable: 'true' },
+      ax: { role: 'textbox', name: '', ignored: true, props: {} },
+    });
+    expect(isInteractive(editable, table([editable]))).toBe(true);
+  });
 });

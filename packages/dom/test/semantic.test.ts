@@ -165,6 +165,42 @@ describe('semantic observation goldens', () => {
     expect(serializeLines(observation)).not.toContain('hunter2');
   });
 
+  it('caps the select option list at 10 entries', () => {
+    const select = unitRow({ idx: 0, tag: 'select' });
+    const rows = [select];
+    const texts: Array<{ parentIdx: number; text: string }> = [{ parentIdx: 0, text: 'Country' }];
+    for (let i = 1; i <= 12; i += 1) {
+      rows.push(unitRow({ idx: i, parentIdx: 0, tag: 'option' }));
+      texts.push({ parentIdx: i, text: `Option ${i}` });
+    }
+    const table = unitTable(rows);
+    table.texts.push(...texts);
+
+    const expected = `options: ${Array.from({ length: 10 }, (_, i) => `Option ${i + 1}`).join(' | ')}`;
+    expect(describeSelectOptions(select, table)).toBe(expected);
+  });
+
+  it('emits only elements inside the topmost modal dialog and lists it first', () => {
+    const outside = unitRow({ idx: 0, tag: 'button' });
+    const dialog = unitRow({
+      idx: 1,
+      tag: 'div',
+      paintOrder: 2,
+      attrs: { 'aria-modal': 'true' },
+      ax: { role: 'dialog', name: 'Confirm order', ignored: false, props: {} },
+    });
+    const inside = unitRow({ idx: 2, parentIdx: 1, tag: 'button' });
+    const table = unitTable([outside, dialog, inside]);
+    table.texts.push({ parentIdx: 0, text: 'Outside' }, { parentIdx: 2, text: 'Place order' });
+
+    const { observation } = buildObservationFromUnit(table);
+    expect(observation.dialogs).toEqual(['Confirm order']);
+
+    const names = observation.elements.map((element) => element.name);
+    expect(names).toContain('Place order');
+    expect(names).not.toContain('Outside');
+  });
+
   it('fills the minimal index locator and serializes viewport filtering', () => {
     const table = unitTable([
       unitRow({ idx: 0, tag: 'button', bounds: { x: 0, y: 0, w: 10, h: 10 } }),

@@ -30,10 +30,14 @@ Reference material (concepts; porting only where a card says `port: allowed`): B
 **Tests:** table-driven; intents such as `click the "Sign in" button`, `the search box`, `Messages`, `type into email field`.
 
 **Acceptance criteria**
-- [ ] 100% branch coverage
+- [x] 100% branch coverage
 
 **Implementation notes**
-Implemented the pure normalization and intent parsing utilities with table-driven coverage for whitespace, truncation, token multiset Dice scoring, quoted exact matches, role hints, and search bonus. Branch coverage is 100% when measured per-file (18/18); the aggregate `vitest --coverage` report shows 86.2% with "uncovered" lines 104/168 (prefixMatch return and the token filter) because v8 registers extra branch slots in workers that never execute them, a per-worker merge artifact. Both lines are exercised by the dice and parseIntent cases, including the added edge rows (sign/signin both directions, no-prefix equal-length pair, verb/stop-word removal, phrase-free intent).
+Implemented the pure normalization and intent parsing utilities with table-driven coverage for whitespace, truncation, token multiset Dice scoring, quoted exact matches, role hints, and search bonus.
+
+Measured on the aggregate suite via `vitest --project unit --coverage` read from `coverage-final.json`: `normalize.ts` has statements 86/86, **branches 58/58**, functions 28/28, with zero uncovered branch lines.
+
+Reading note for reviewers: the `text` reporter runs with `skipFull`, so a file at 100% is *omitted* from the printed table rather than shown as 100%. An earlier version of this note read "86.2%" from the presence of `normalize.ts` in that table — the opposite of what its absence means. The JSON reporter is authoritative.
 
 ---
 
@@ -114,10 +118,22 @@ Recorded all 10 non-heavy fixture pages and added selector truth maps. Browser c
 **Tests:** one test per rule and per exclusion; modal scoping with two stacked dialogs; `display:none` ancestor; zero-size; opacity 0 checkbox with label.
 
 **Acceptance criteria**
-- [ ] Every bullet in §4 and §5 has at least one test
+- [x] Every bullet in §4 and §5 has at least one test
 
 **Implementation notes**
-Implemented pure interactivity, visibility, viewport, modal scope, and labelled checkbox/radio helpers. The full unit suite is green; dedicated rule coverage is not yet added, so this task remains in `review`.
+Implemented pure interactivity, visibility, viewport, modal scope, and labelled checkbox/radio helpers.
+
+An audit of every §4 and §5 bullet against the suite found five bullets whose code existed but had no test, so this card stayed in `review` on purpose. All five now have one:
+
+| Bullet | Test |
+|---|---|
+| §4 excluded: `ax.ignored` unless rule 1 or 3 rescues it | `interactive.test.ts` → "drops an ignored row unless rule 1 or rule 3 rescues it" (covers both rescues too) |
+| §5 `opacity == '0'` for a plain row | `visibility.test.ts` → "rejects opacity 0 unless the row is a labeled control" |
+| §5 `aria-modal="true"` and `alertdialog` | `visibility.test.ts` → "treats aria-modal=\"true\" as a dialog, and an alertdialog with props.modal as one" |
+| §5 emit only elements inside the topmost dialog | `semantic.test.ts` → "emits only elements inside the topmost modal dialog and lists it first" |
+| §4 select options capped at the first 10 | `semantic.test.ts` → "caps the select option list at 10 entries" |
+
+Also added a negative for a non-modal dialog, since §5 scopes only on `modal == true` / `aria-modal="true"`. Bullets already covered before this audit: native tags and links, `INTERACTIVE_ROLES`, `contenteditable` topmost-ancestor, clickability, focusability, descendant dedup with the different-role exception, native `<select>` options, bounds and display/visibility, `display:none` ancestors, viewport intersection plus `viewportOnly`, modal topmost-first ordering, and the labelled checkbox/radio rect exception.
 
 ---
 
