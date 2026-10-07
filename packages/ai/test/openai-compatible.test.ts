@@ -106,4 +106,71 @@ describe('OpenAI-compatible provider', () => {
     expect(calls).toBe(3);
     delete process.env.BROWSER_OS_TEST_KEY;
   });
+
+  it('retries a 429 and succeeds on the next attempt', async () => {
+    process.env.BROWSER_OS_TEST_KEY = 'test-secret';
+    let calls = 0;
+    const url = await localServer(() => {
+      calls += 1;
+      return calls === 1
+        ? { status: 429, body: { error: 'rate limited' } }
+        : { body: { choices: [{ message: { content: '{"ref":"e1"}' } }] } };
+    });
+
+    const response = await new OpenAiCompatibleProvider({
+      baseUrl: url,
+      model: 'local',
+      apiKeyEnv: 'BROWSER_OS_TEST_KEY',
+    }).complete(request);
+
+    expect(calls).toBe(2);
+    expect(response.json).toEqual({ ref: 'e1' });
+    delete process.env.BROWSER_OS_TEST_KEY;
+  });
+
+  it('gives up with LLM_UNAVAILABLE after two retries on a persistent 500', async () => {
+    process.env.BROWSER_OS_TEST_KEY = 'test-secret';
+    let calls = 0;
+    const url = await localServer(() => {
+      calls += 1;
+      return { status: 500, body: { error: 'boom' } };
+    });
+
+    await expect(
+      new OpenAiCompatibleProvider({
+        baseUrl: url,
+        model: 'local',
+        apiKeyEnv: 'BROWSER_OS_TEST_KEY',
+      }).complete(request),
+    ).rejects.toMatchObject({ code: 'LLM_UNAVAILABLE' });
+
+    // One initial attempt plus at most two retries.
+    expect(calls).toBe(3);
+    delete process.env.BROWSER_OS_TEST_KEY;
+  });
+
+  it('aborts at timeoutMs when the server never answers', async () => {
+    process.env.BROWSER_OS_TEST_KEY = 'test-secret';
+    // A handler-less server: the socket stays open, so only the client's
+    // AbortController can end the call.
+    const server = createServer(() => {});
+    servers.push(server);
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('server did not bind');
+
+    const started = Date.now();
+    await expect(
+      new OpenAiCompatibleProvider({
+        baseUrl: `http://127.0.0.1:${address.port}/v1`,
+        model: 'local',
+        apiKeyEnv: 'BROWSER_OS_TEST_KEY',
+      }).complete({ ...request, timeoutMs: 200 }),
+    ).rejects.toMatchObject({ code: 'LLM_UNAVAILABLE' });
+    expect(Date.now() - started).toBeLessThan(5000);
+
+    server.closeAllConnections?.();
+    delete process.env.BROWSER_OS_TEST_KEY;
+  });
 });

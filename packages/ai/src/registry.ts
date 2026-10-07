@@ -1,16 +1,34 @@
 import type { ModelProvider, ModelTier } from '@browser-os/protocol';
-import { type Config, ConfigSchema } from '@browser-os/protocol';
+import { BosError, type Config, ConfigSchema } from '@browser-os/protocol';
 import { AnthropicProvider } from './anthropic.js';
 import { FakeModelProvider } from './fake-provider.js';
 import { OpenAiCompatibleProvider } from './openai-compatible.js';
 
 export type RegistryConfig = Config['models'];
 
+/**
+ * Zod's own error carries no `code` the gateway can route on, so translate it
+ * once here: the message keeps zod's path/issue wording readable, and
+ * `details.issues` keeps the structured form for callers that want it.
+ */
+function parseModels(config: unknown): Config['models'] {
+  const result = ConfigSchema.shape.models.safeParse(config);
+  if (result.success) return result.data;
+  const issues = result.error.issues;
+  const readable = issues
+    .map((issue) => `${issue.path.length > 0 ? issue.path.join('.') : '(root)'}: ${issue.message}`)
+    .join('; ');
+  const error = new BosError('INVALID_REQUEST', `invalid models config: ${readable}`, {
+    details: { issues },
+  });
+  throw error;
+}
+
 export class ModelRegistry {
   private constructor(private readonly providers: Partial<Record<ModelTier, ModelProvider>>) {}
 
   static fromConfig(config: unknown, env: NodeJS.ProcessEnv = process.env): ModelRegistry {
-    const parsed = ConfigSchema.shape.models.parse(config);
+    const parsed = parseModels(config);
     void env;
     const providers: Partial<Record<ModelTier, ModelProvider>> = {};
     for (const tier of ['fast', 'capable', 'vision'] as const) {

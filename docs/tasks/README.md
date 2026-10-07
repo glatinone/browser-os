@@ -56,11 +56,11 @@ Task cards: `phase-XX-*.md` in this folder. Conflicts and questions: `CONFLICTS.
 | P4-11 | Observer (runtime) | P4-06, P4-08, P2-07 | cheap | done |
 | P4-12 | Mutation fixtures + locator robustness suite | P4-08 | cheap | done |
 | **Phase 5** | **AI providers** | | | |
-| P5-01 | FakeModelProvider | P1-02 | cheap | todo |
-| P5-02 | OpenAI-compatible provider | P5-01 | cheap | todo |
-| P5-03 | Anthropic provider | P5-02 | cheap | todo |
-| P5-04 | Model registry from config | P5-02, P5-03, P1-03 | cheap | todo |
-| P5-05 | Resolve-target prompt + output validation | P5-01 | review | todo |
+| P5-01 | FakeModelProvider | P1-02 | cheap | review |
+| P5-02 | OpenAI-compatible provider | P5-01 | cheap | review |
+| P5-03 | Anthropic provider | P5-02 | cheap | done |
+| P5-04 | Model registry from config | P5-02, P5-03, P1-03 | cheap | done |
+| P5-05 | Resolve-target prompt + output validation | P5-01 | review | review |
 | **Phase 6** | **Memory** | | | |
 | P6-01 | Store, migrations, schema 001 | P1-02 | cheap | done |
 | P6-02 | Keys and normalization | P1-02 | cheap | done |
