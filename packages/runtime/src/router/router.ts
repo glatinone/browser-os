@@ -1,7 +1,10 @@
 import type { PageDriver, ResolvedTarget } from '@browser-os/browser';
 import type { EventBus, ValueSource } from '@browser-os/protocol';
+import { ERROR_CODES, type ErrorCode } from '@browser-os/protocol';
 import { BosError } from '../errors.js';
 import { DEFAULT_ROUTER_CONSTANTS } from './constants.js';
+import { resolveQuery } from './resolve-query.js';
+import { resolveRef } from './resolve-ref.js';
 import { pageChanged, settleAfter, toResolvedTarget, verifyAction } from './verify.js';
 
 export class ActionRouter {
@@ -66,13 +69,8 @@ export class ActionRouter {
     try {
       resolved = await this.resolveTarget(action, ctx, attempts, opts.healIntent ?? null);
     } catch (error) {
-      if (error instanceof BosError) {
-        return this.finish(actionId, startedAt, action, {
-          ok: false,
-          error: { code: error.code, message: error.message },
-        });
-      }
-      throw error;
+      if (error instanceof BosError && error.code === 'CANCELLED') throw error;
+      return this.finish(actionId, startedAt, action, { ok: false, error: this.toResultError(error) });
     }
 
     // D. Security challenge check
@@ -98,6 +96,11 @@ export class ActionRouter {
       }
     }
 
+    const lastAttempt = attempts[attempts.length - 1];
+    if (lastAttempt) {
+      this.events.emit({ ts: startedAt, type: 'action.tier', data: { actionId, attempt: lastAttempt } });
+    }
+
     // F. Execute with driver fallback
     const value = await this.resolveValue(action.value, ctx);
     const target: ResolvedTarget = toResolvedTarget(resolved);
@@ -107,26 +110,43 @@ export class ActionRouter {
 
     try {
       driverResult = await this.driver.cdpPerform(action, target, value);
-      driverUsed = 'cdp';
     } catch (e) {
-      // Fallback to Playwright only on effect === 'none'
-      if ((e as any).effect === 'none') {
-        driverResult = await this.driver.playwrightPerform(action, target, value);
-        driverUsed = 'playwright';
+      // Fallback to Playwright only when the failed action provably had no effect (S20).
+      const effect = (e as { effect?: string }).effect;
+      if (effect === 'none') {
+        try {
+          driverResult = await this.driver.playwrightPerform(action, target, value);
+          driverUsed = 'playwright';
+        } catch (fallbackError) {
+          return this.finish(actionId, startedAt, action, {
+            ok: false,
+            error: this.toResultError(fallbackError),
+          });
+        }
       } else {
-        throw e;
+        // effect 'unknown' (or any other claim) is never retried blindly: report and stop.
+        return this.finish(actionId, startedAt, action, { ok: false, error: this.toResultError(e) });
       }
     }
 
+    // Requirement 4: an executed action invalidates the cached observation for this page.
+    this.observer?.invalidate?.(ctx.pageId);
+
     // G. Verify + settle
-    const changed = pageChanged(
+    let changed = pageChanged(
       driverResult?.urlBefore ?? '',
       driverResult?.urlAfter ?? '',
       driverResult?.navigated === true,
     );
-    await verifyAction({ action, driver: this.driver, target, value, changed });
-    const actionTimeoutMs = ctx.policy?.budgets?.actionTimeoutMs ?? this.constants.settleMaxMs;
-    await settleAfter(this.driver, this.constants, actionTimeoutMs, changed);
+    try {
+      await verifyAction({ action, driver: this.driver, target, value, changed });
+      const actionTimeoutMs = ctx.policy?.budgets?.actionTimeoutMs ?? this.constants.settleMaxMs;
+      await settleAfter(this.driver, this.constants, actionTimeoutMs, changed);
+    } catch (e) {
+      // `execute` never throws except CANCELLED: a failed verification is a failed ActionResult.
+      if (e instanceof BosError && e.code === 'CANCELLED') throw e;
+      return this.finish(actionId, startedAt, action, { ok: false, error: this.toResultError(e) });
+    }
 
     // H. Learn / cache
     if (action.target.kind === 'intent' && ['deterministic', 'llm', 'vision', 'human'].includes(resolved.tier)) {
@@ -146,7 +166,7 @@ export class ActionRouter {
       action,
       tier: resolved.tier,
       driver: driverUsed,
-      attempts: [],
+      attempts,
       element: resolved.element,
       locator: resolved.locator,
       url: resolved.url,
@@ -222,32 +242,75 @@ export class ActionRouter {
   }
 
   private async resolveRefTarget(target: any, ctx: any, attempts: any[]): Promise<any> {
-    // Stub - would use observer.index
-    throw new BosError('TARGET_NOT_FOUND', 'Ref resolution not implemented');
+    const { observation, index } = await this.observer.capture(ctx.sessionId, ctx.pageId);
+    const staleIndex = this.observer.index(target.observationId) ?? null;
+    const resolution = resolveRef({
+      target,
+      observation,
+      index,
+      staleIndex,
+      accept: this.constants.matchAccept,
+      margin: this.constants.matchMargin,
+    });
+    attempts.push({ tier: 'ref', ok: true, ms: 0 });
+    return resolution;
   }
 
   private async resolveLocatorTarget(target: any, ctx: any, attempts: any[]): Promise<any> {
-    // Use existing resolveLocator
+    // Locator tier arrives with P7-03 (intent/locator tiers are out of P7-02 scope).
     throw new BosError('TARGET_NOT_FOUND', 'Locator resolution not implemented');
   }
 
   private async resolveQueryTarget(target: any, ctx: any, attempts: any[]): Promise<any> {
-    throw new BosError('TARGET_NOT_FOUND', 'Query resolution not implemented');
+    const { observation, index } = await this.observer.capture(ctx.sessionId, ctx.pageId);
+    const resolution = resolveQuery(observation, index, target);
+    attempts.push({ tier: 'deterministic', ok: true, ms: 0 });
+    return resolution;
   }
 
   private async resolveIntentTarget(target: any, ctx: any, attempts: any[], healIntent: string | null): Promise<any> {
     throw new BosError('TARGET_NOT_FOUND', 'Intent resolution not implemented');
   }
 
-  private async resolveValue(value: ValueSource, ctx: any): Promise<string> {
+  private async resolveValue(value: ValueSource | undefined, ctx: any): Promise<string | undefined> {
+    if (value === undefined) return undefined; // click / hover / press carry no value
     if (value.kind === 'literal') return value.value;
     if (value.kind === 'param') return ctx.params[value.name] ?? '';
     if (value.kind === 'secret') return await ctx.secrets.resolve(value.name);
     throw new Error(`Unknown value source: ${(value as any).kind}`);
   }
 
+  /**
+   * Requirement 2 / S20: every failure leaves `execute` as an
+   * `ActionResult { ok: false }` (only CANCELLED propagates). `details.effect`
+   * is preserved so the caller can see why nothing was retried, and an effect
+   * that is not provably `'none'` is reported as ACTION_FAILED, never retried.
+   */
+  private toResultError(e: unknown): { code: ErrorCode; message: string; details?: Record<string, unknown> } {
+    if (e instanceof BosError) {
+      return e.details
+        ? { code: e.code, message: e.message, details: e.details }
+        : { code: e.code, message: e.message };
+    }
+
+    const raw = (e ?? {}) as { code?: unknown; message?: unknown; effect?: unknown; details?: unknown };
+    const effect = typeof raw.effect === 'string' ? raw.effect : undefined;
+    const message = typeof raw.message === 'string' ? raw.message : String(e);
+    const known =
+      typeof raw.code === 'string' && (ERROR_CODES as readonly string[]).includes(raw.code) ? raw.code : undefined;
+    // S20: a failure whose effect is not 'none' is ACTION_FAILED with details.effect.
+    const code: ErrorCode =
+      effect !== undefined && effect !== 'none' ? 'ACTION_FAILED' : ((known ?? 'ACTION_FAILED') as ErrorCode);
+
+    const details: Record<string, unknown> = {};
+    if (effect !== undefined) details.effect = effect;
+    if (raw.details && typeof raw.details === 'object') Object.assign(details, raw.details as Record<string, unknown>);
+
+    return Object.keys(details).length > 0 ? { code, message, details } : { code, message };
+  }
+
   private finish(actionId: string, startedAt: number, action: any, result: any): any {
-    return {
+    const built = {
       ok: result.ok,
       action,
       tier: result.tier ?? null,
@@ -263,5 +326,7 @@ export class ActionRouter {
       risk: result.risk ?? null,
       error: result.error,
     };
+    this.events.emit({ ts: Date.now(), type: 'action.completed', data: { actionId, result: built } });
+    return built;
   }
 }
