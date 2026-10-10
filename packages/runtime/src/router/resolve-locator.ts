@@ -1,6 +1,4 @@
-import type { ElementLocator, IndexEntry, ResolvedTarget, ExecutionContext } from '@browser-os/protocol';
-import type { PageDriver } from '@browser-os/browser';
-import { BosError } from '../errors.js';
+import type { IndexEntry } from '@browser-os/protocol';
 import { DEFAULT_ROUTER_CONSTANTS } from './constants.js';
 
 export interface ProbeCandidate {
@@ -14,11 +12,13 @@ export interface ProbeCandidate {
   disabled: boolean;
 }
 
-export function matchLocator(
-  obs: any,
-  locator: any,
-  constants: typeof DEFAULT_ROUTER_CONSTANTS
-): Array<{ entry: IndexEntry; score: number }> {
+export interface LocatorCandidate {
+  entry: IndexEntry;
+  score: number;
+  element: { ref: string; role: string; name: string };
+}
+
+export function matchLocator(obs: any, locator: any, constants: typeof DEFAULT_ROUTER_CONSTANTS): LocatorCandidate[] {
   // Fingerprint matching - dom-intelligence §8.4
   const candidates = obs.elements
     .map((el: any, idx: number) => {
@@ -46,9 +46,7 @@ export function matchLocator(
 
       // Context match
       if (loc.context && loc.context.length > 0) {
-        const contextMatch = loc.context.some((c: string) =>
-          el.context?.includes(c)
-        );
+        const contextMatch = loc.context.some((c: string) => el.context?.includes(c));
         if (contextMatch) score += 0.1;
       }
 
@@ -79,12 +77,12 @@ export async function tryResolveLocator(
   ctx: any,
   driver: any,
   observer: any,
-  constants: typeof DEFAULT_ROUTER_CONSTANTS
+  constants: typeof DEFAULT_ROUTER_CONSTANTS,
 ): Promise<any | null> {
   // Stage 1: Probe (no full observation) - only for main frame
   if (locator.framePath.length === 0) {
     const deadline = Date.now() + constants.probeTimeoutMs;
-    
+
     while (Date.now() < deadline) {
       try {
         const candidates = await probeLocator(driver, locator, ctx);
@@ -105,20 +103,22 @@ export async function tryResolveLocator(
       } catch {
         // probe failed, continue waiting
       }
-      await new Promise(r => setTimeout(r, DEFAULT_ROUTER_CONSTANTS.probeIntervalMs));
+      await new Promise((r) => setTimeout(r, DEFAULT_ROUTER_CONSTANTS.probeIntervalMs));
     }
   }
 
   // Stage 2: Full observation + fingerprint scoring
   const obs = await driver.capture();
   const scored = matchLocator(obs, locator, DEFAULT_ROUTER_CONSTANTS);
-  
-  if (scored.length > 0) {
-    const best = scored[0];
+
+  const best = scored[0];
+  if (best) {
     const secondBest = scored[1]?.score ?? 0;
-    
-    if (best.score >= DEFAULT_ROUTER_CONSTANTS.matchAccept && 
-        best.score - secondBest >= DEFAULT_ROUTER_CONSTANTS.matchMargin) {
+
+    if (
+      best.score >= DEFAULT_ROUTER_CONSTANTS.matchAccept &&
+      best.score - secondBest >= DEFAULT_ROUTER_CONSTANTS.matchMargin
+    ) {
       attempts.push({ tier: 'cache', ok: true, score: best.score, reason: 'matched' });
       return {
         tier: tierLabel,

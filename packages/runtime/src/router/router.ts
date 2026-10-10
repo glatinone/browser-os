@@ -1,15 +1,8 @@
-import type { Budget, ExecutionContext, Observation, ObservationIndex, Policy, Tier, TierAttempt, ValueSource, BrowserAction, BrowserActionType, IndexEntry, ErrorCode, ElementLocator, ActionResult, ActionType, Driver } from '@browser-os/protocol';
 import type { PageDriver, ResolvedTarget } from '@browser-os/browser';
+import type { EventBus, ValueSource } from '@browser-os/protocol';
 import { BosError } from '../errors.js';
 import { DEFAULT_ROUTER_CONSTANTS } from './constants.js';
-import { EventBus } from '@browser-os/protocol';
-import type { ActionCachePort, RouterConstants, RouterDeps, Resolution, toResolvedTarget } from './types.js';
-import { DEFAULT_ROUTER_CONSTANTS } from './constants.js';
-import { ActionResult, ActionType, Tier, TierAttempt, Driver } from '@browser-os/protocol';
-import { EventBus } from '@browser-os/protocol';
-import type { ModelProvider } from '@browser-os/ai';
-import type { RiskClassifier, PermissionGate, HumanGate, RiskResult } from '../security/interfaces.js';
-import { BosError } from '../errors.js';
+import { pageChanged, settleAfter, toResolvedTarget, verifyAction } from './verify.js';
 
 export class ActionRouter {
   private readonly driver: PageDriver;
@@ -41,7 +34,7 @@ export class ActionRouter {
   async execute(action: any, ctx: any, opts: { healIntent?: string | null } = {}): Promise<any> {
     const actionId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     const startedAt = Date.now();
-    
+
     const maskAction = (a: any) => {
       if (!a.target || a.target.kind !== 'fill') return a;
       const v = a.target as any;
@@ -51,11 +44,14 @@ export class ActionRouter {
       return a;
     };
 
-    this.events.emit('action.started', { actionId, action: maskAction(action) });
+    this.events.emit({ ts: startedAt, type: 'action.started', data: { actionId, action: maskAction(action) } });
 
     // A. Site access check
     if (await this.checkSiteAccess(ctx, action)) {
-      return this.finish(actionId, startedAt, action, { ok: false, error: { code: 'PERMISSION_DENIED', message: 'Site access denied by policy' } });
+      return this.finish(actionId, startedAt, action, {
+        ok: false,
+        error: { code: 'PERMISSION_DENIED', message: 'Site access denied by policy' },
+      });
     }
 
     // B. Targetless actions
@@ -71,7 +67,10 @@ export class ActionRouter {
       resolved = await this.resolveTarget(action, ctx, attempts, opts.healIntent ?? null);
     } catch (error) {
       if (error instanceof BosError) {
-        return this.finish(actionId, startedAt, action, { ok: false, error: { code: error.code, message: error.message } });
+        return this.finish(actionId, startedAt, action, {
+          ok: false,
+          error: { code: error.code, message: error.message },
+        });
       }
       throw error;
     }
@@ -84,28 +83,35 @@ export class ActionRouter {
     const decision = await this.permissions.decide(riskResult, ctx.policy, resolved.origin);
 
     if (decision === 'deny') {
-      return this.finish(actionId, startedAt, action, { ok: false, error: { code: 'PERMISSION_DENIED', message: 'Permission denied by policy' } });
+      return this.finish(actionId, startedAt, action, {
+        ok: false,
+        error: { code: 'PERMISSION_DENIED', message: 'Permission denied by policy' },
+      });
     }
     if (decision === 'confirm') {
       const answer = await this.permissions.requestConfirmation({} as any);
       if (answer === 'reject') {
-        return this.finish(actionId, startedAt, action, { ok: false, error: { code: 'PERMISSION_DENIED', message: 'Confirmation rejected' } });
+        return this.finish(actionId, startedAt, action, {
+          ok: false,
+          error: { code: 'PERMISSION_DENIED', message: 'Confirmation rejected' },
+        });
       }
     }
 
     // F. Execute with driver fallback
     const value = await this.resolveValue(action.value, ctx);
-    
+    const target: ResolvedTarget = toResolvedTarget(resolved);
+
     let driverUsed: 'cdp' | 'playwright' = 'cdp';
     let driverResult: any;
 
     try {
-      driverResult = await this.driver.cdp.perform(action, resolved, value);
+      driverResult = await this.driver.cdpPerform(action, target, value);
       driverUsed = 'cdp';
     } catch (e) {
       // Fallback to Playwright only on effect === 'none'
       if ((e as any).effect === 'none') {
-        driverResult = await this.driver.playwright.perform(action, resolved.locator, value);
+        driverResult = await this.driver.playwrightPerform(action, target, value);
         driverUsed = 'playwright';
       } else {
         throw e;
@@ -113,8 +119,14 @@ export class ActionRouter {
     }
 
     // G. Verify + settle
-    await verifyAction(this.driver, action, resolved, value);
-    await settle(this.driver, ctx);
+    const changed = pageChanged(
+      driverResult?.urlBefore ?? '',
+      driverResult?.urlAfter ?? '',
+      driverResult?.navigated === true,
+    );
+    await verifyAction({ action, driver: this.driver, target, value, changed });
+    const actionTimeoutMs = ctx.policy?.budgets?.actionTimeoutMs ?? this.constants.settleMaxMs;
+    await settleAfter(this.driver, this.constants, actionTimeoutMs, changed);
 
     // H. Learn / cache
     if (action.target.kind === 'intent' && ['deterministic', 'llm', 'vision', 'human'].includes(resolved.tier)) {
@@ -138,7 +150,7 @@ export class ActionRouter {
       element: resolved.element,
       locator: resolved.locator,
       url: resolved.url,
-      pageChanged: false,
+      pageChanged: changed,
       ms: Date.now() - startedAt,
       llm: { calls: 0, inputTokens: 0, outputTokens: 0 },
       risk: null,
@@ -156,20 +168,45 @@ export class ActionRouter {
 
   private async executeTargetless(action: any, ctx: any, actionId: string, startedAt: number): Promise<any> {
     if (action.type === 'navigate') {
-      await this.driver.cdp.navigate(action.url);
-      await this.driver.settle();
-      return this.finish(actionId, startedAt, action, { ok: true, action, tier: null, driver: 'cdp', attempts: [], url: action.url, pageChanged: true, ms: Date.now() - startedAt, llm: { calls: 0, inputTokens: 0, outputTokens: 0 }, risk: null });
+      await this.driver.navigate(action.url, action.timeoutMs ?? this.constants.settleMaxMs);
+      await this.driver.settle(this.constants.settleQuietMs, this.constants.settleMaxMs);
+      return this.finish(actionId, startedAt, action, {
+        ok: true,
+        action,
+        tier: null,
+        driver: 'cdp',
+        attempts: [],
+        url: action.url,
+        pageChanged: true,
+        ms: Date.now() - startedAt,
+        llm: { calls: 0, inputTokens: 0, outputTokens: 0 },
+        risk: null,
+      });
     }
     if (action.type === 'wait') {
-      await new Promise(resolve => setTimeout(resolve, action.timeoutMs ?? 1000));
-      return this.finish(actionId, startedAt, action, { ok: true, action, tier: null, driver: null, attempts: [], url: '', pageChanged: false, ms: Date.now() - startedAt, llm: { calls: 0, inputTokens: 0, outputTokens: 0 }, risk: null });
+      await new Promise((resolve) => setTimeout(resolve, action.timeoutMs ?? 1000));
+      return this.finish(actionId, startedAt, action, {
+        ok: true,
+        action,
+        tier: null,
+        driver: null,
+        attempts: [],
+        url: '',
+        pageChanged: false,
+        ms: Date.now() - startedAt,
+        llm: { calls: 0, inputTokens: 0, outputTokens: 0 },
+        risk: null,
+      });
     }
-    return this.finish(actionId, startedAt, action, { ok: false, error: { code: 'INVALID_REQUEST', message: `Unknown targetless action ${action.type}` } });
+    return this.finish(actionId, startedAt, action, {
+      ok: false,
+      error: { code: 'INVALID_REQUEST', message: `Unknown targetless action ${action.type}` },
+    });
   }
 
   private async resolveTarget(action: any, ctx: any, attempts: any[], healIntent: string | null): Promise<any> {
     const target = action.target;
-    
+
     switch (target.kind) {
       case 'ref':
         return this.resolveRefTarget(target, ctx, attempts);
@@ -228,6 +265,3 @@ export class ActionRouter {
     };
   }
 }
-
-// Need to export the BosError class
-import { BosError } from '@browser-os/protocol';

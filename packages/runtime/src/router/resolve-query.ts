@@ -1,107 +1,101 @@
-import type { Observation, IndexEntry, ResolvedTarget, ExecutionContext } from '@browser-os/protocol';
+import type { IndexEntry, Observation, ObservationIndex, Target } from '@browser-os/protocol';
 import { BosError } from '../errors.js';
-import { DEFAULT_ROUTER_CONSTANTS } from './constants.js';
+import { buildResolution, type Resolution } from './types.js';
 
-export interface QueryTarget {
-  kind: 'query';
-  role?: string;
-  name?: string;
-  text?: string;
-  css?: string;
-  nth?: number;
+export type QueryTarget = Extract<Target, { kind: 'query' }>;
+
+export interface QueryCandidate {
+  ref: string;
+  entry: IndexEntry;
+  /** 1 for an exact criterion, 0.9 for a contains match; averaged over the criteria given. */
+  score: number;
 }
 
+function textOf(entry: IndexEntry): string {
+  const el = entry.locator;
+  return `${el.name} ${el.role} ${el.cssPath} ${Object.values(el.attrs ?? {}).join(' ')}`.toLowerCase();
+}
+
+/**
+ * The deterministic query tier (action-router §5 case `query`, `structuredFilter`).
+ *
+ * Every criterion present is ANDed. `name` accepts exact first, then contains;
+ * `css` matches the index css path (a live `querySelectorAll` needs the page
+ * and belongs to the probe executor, not to this pure tier).
+ */
 export function structuredFilter(
-  obs: any,
-  target: any
-): any[] {
-  let matches = obs.elements;
-  
-  if (target.role) {
-    matches = matches.filter((el: any) => el.role === target.role);
+  observation: Observation,
+  index: ObservationIndex,
+  query: QueryTarget,
+): QueryCandidate[] {
+  const out: QueryCandidate[] = [];
+
+  for (const element of observation.elements) {
+    const entry = index.entries.get(element.ref);
+    if (!entry) continue;
+    const role = element.role;
+    const name = element.name;
+    let points = 0;
+    let criteria = 0;
+
+    if (query.role !== undefined) {
+      criteria += 1;
+      if (role === query.role) points += 1;
+      else continue;
+    }
+    if (query.name !== undefined) {
+      criteria += 1;
+      const exact = name.toLowerCase() === query.name.toLowerCase();
+      if (exact) points += 1;
+      else if (name.toLowerCase().includes(query.name.toLowerCase())) points += 0.9;
+      else continue;
+    }
+    if (query.text !== undefined) {
+      criteria += 1;
+      const needle = query.text.toLowerCase();
+      const haystack = `${name} ${textOf(entry)}`;
+      if (haystack.includes(needle)) points += 1;
+      else continue;
+    }
+    if (query.css !== undefined) {
+      criteria += 1;
+      const path = entry.locator.cssPath;
+      if (path === query.css || path.endsWith(query.css)) points += 1;
+      else continue;
+    }
+
+    if (criteria === 0) points = 1;
+    out.push({ ref: element.ref, entry, score: points / (criteria || 1) });
   }
-  if (target.name) {
-    matches = matches.filter((el: any) => 
-      el.name === target.name || el.name?.includes(target.name)
-    );
-  }
-  if (target.text) {
-    matches = matches.filter((el: any) => 
-      el.value?.includes(target.text) || el.text?.includes(target.text)
-    );
-  }
-  if (target.css) {
-    matches = matches.filter((el: any) => el.cssPath === target.css);
-  }
-  
-  return matches;
+
+  return out.sort((a, b) => b.score - a.score);
 }
 
-export function isCompatible(element: any, actionType: string): boolean {
-  switch (element.role) {
-    case 'textbox':
-    case 'searchbox':
-    case 'combobox':
-    case 'spinbutton':
-    case 'textbox':
-      return actionType === 'fill' || actionType === 'click' || actionType === 'press' || actionType === 'waitFor' || actionType === 'extract';
-    case 'button':
-    case 'link':
-      return actionType === 'click' || actionType === 'hover' || actionType === 'press' || actionType === 'waitFor' || actionType === 'extract';
-    case 'checkbox':
-    case 'radio':
-    case 'switch':
-      return actionType === 'click' || actionType === 'press' || actionType === 'waitFor' || actionType === 'extract';
-    case 'select':
-    case 'listbox':
-    case 'combobox':
-      return actionType === 'select' || actionType === 'click' || actionType === 'waitFor' || actionType === 'extract';
-    case 'slider':
-    case 'spinbutton':
-      return actionType === 'click' || actionType === 'press' || actionType === 'waitFor' || actionType === 'extract';
-    default:
-      return actionType === 'click' || actionType === 'hover' || actionType === 'press' || actionType === 'waitFor' || actionType === 'extract';
-  }
-}
+export function resolveQuery(observation: Observation, index: ObservationIndex, query: QueryTarget): Resolution {
+  const matches = structuredFilter(observation, index, query);
+  const brief = matches.slice(0, 5).map((m) => ({ ref: m.ref, score: m.score }));
 
-export async function resolveQueryTarget(
-  target: any,
-  ctx: any,
-  attempts: any[],
-  driver: any,
-  observer: any
-): Promise<any> {
-  const obs = await driver.capture();
-  const matches = structuredFilter(obs, target);
-  
-  if (matches.length === 0) {
-    throw new BosError('TARGET_NOT_FOUND', `No elements match query`);
+  if (query.nth !== undefined) {
+    const picked = matches[query.nth];
+    if (!picked) {
+      throw new BosError('TARGET_NOT_FOUND', 'No element matches this query at that position', {
+        details: { nth: query.nth, matches: matches.length, candidates: brief },
+      });
+    }
+    return buildResolution('deterministic', observation, picked.ref, picked.entry);
   }
-  
-  if (target.nth !== undefined && matches.length > target.nth) {
-    const element = matches[target.nth];
-    return buildResolution(element, 'deterministic', 'query');
-  }
-  
-  if (matches.length === 1) {
-    return buildResolution(matches[0], 'deterministic', 'query');
-  }
-  
-  throw new BosError('TARGET_AMBIGUOUS', `${matches.length} elements match query`, {
-    candidates: matches.slice(0, 5).map((el: any) => ({ ref: el.ref, role: el.role, name: el.name }))
-  });
-}
 
-function buildResolution(element: any, tier: string, targetKind: string) {
-  return {
-    tier,
-    entry: {
-      backendNodeId: element.backendNodeId,
-      frameId: element.frame,
-      cdpFrameId: element.cdpFrameId,
-      locator: element.locator,
-    },
-    element: { ref: element.ref, role: element.role, name: element.name },
-    disabled: element.disabled,
-  };
+  const [first, ...rest] = matches;
+  if (!first) {
+    throw new BosError('TARGET_NOT_FOUND', 'No element matches this query', {
+      details: { query: { role: query.role, name: query.name, text: query.text, css: query.css } },
+    });
+  }
+  if (rest.length > 0) {
+    throw new BosError('TARGET_AMBIGUOUS', 'More than one element matches this query; use `nth`', {
+      details: { matches: matches.length, candidates: brief },
+    });
+  }
+
+  return buildResolution('deterministic', observation, first.ref, first.entry);
 }
