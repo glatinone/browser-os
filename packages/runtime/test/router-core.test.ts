@@ -4,7 +4,9 @@ import { ActionRouter } from '../src/router/router.js';
 
 /**
  * P7-02 router core, unit tier with fakes (card: docs/tasks/phase-07-router-and-tasks.md).
- * Everything here is a fake driver/observer — no page, no CDP, no network.
+ * Everything here is a fake driver/observer — no page, no CDP, no network. The page lock
+ * is the one fake that is real: a working mutex, because requirement 4 is about mutual
+ * exclusion and a pass-through fake would prove nothing.
  */
 
 function makeElement(ref: string, role: string, name: string, tag = 'button'): SemanticElement {
@@ -65,53 +67,121 @@ function makeObservation(
   return { observation, index: { observationId: id, pageId: 'p1', entries } };
 }
 
+/** A working mutex standing in for SessionManager.withPageLock (requirement 4). */
+function makePageLock() {
+  let held = false;
+  let concurrent = 0;
+  let peak = 0;
+  const waiting: Array<() => void> = [];
+  return {
+    async run<T>(fn: () => Promise<T>): Promise<T> {
+      if (held) await new Promise<void>((resolve) => waiting.push(resolve));
+      held = true;
+      concurrent += 1;
+      if (concurrent > peak) peak = concurrent;
+      try {
+        return await fn();
+      } finally {
+        concurrent -= 1;
+        const next = waiting.shift();
+        if (next) next();
+        else held = false;
+      }
+    },
+    isHeld: () => held,
+    peak: () => peak,
+  };
+}
+
+/** A `DriverResult` for a driver that answered without dispatching anything interesting. */
+function stayed(overrides: Record<string, unknown> = {}) {
+  return {
+    ok: true,
+    effect: 'committed',
+    urlBefore: 'https://example.test/',
+    urlAfter: 'https://example.test/',
+    navigated: false,
+    ...overrides,
+  };
+}
+
 interface Fakes {
   router: ActionRouter;
   driver: any;
   observer: any;
+  sessions: any;
+  runs: { insert: ReturnType<typeof vi.fn> };
+  lock: ReturnType<typeof makePageLock>;
+  /** Whether each driver call saw the lock held (the direct proof of requirement 4). */
+  lockSightings: boolean[];
   events: Array<{ type: string; data: any }>;
+}
+
+interface MakeRouterOpts {
+  /** Index served for `Observer.index()` — the old observation the heal path re-matches. */
+  staleIndex?: ObservationIndex;
+  /** Adds two event-loop turns to every CDP perform, so overlap would be observable. */
+  slowDriver?: boolean;
 }
 
 function makeRouter(
   obs: { observation: Observation; index: ObservationIndex },
-  opts: Record<string, unknown> = {},
+  opts: MakeRouterOpts = {},
 ): Fakes {
   const events: Array<{ type: string; data: any }> = [];
-  const driver = {
-    navigate: vi.fn(async () => {}),
+  const lock = makePageLock();
+  const lockSightings: boolean[] = [];
+  const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+  const seeLock = () => lockSightings.push(lock.isHeld());
+  const driver: any = {
+    navigate: vi.fn(async (url: string) => {
+      seeLock();
+      return stayed({ urlBefore: 'https://example.test/', urlAfter: url, navigated: true });
+    }),
     settle: vi.fn(async () => {}),
-    cdpPerform: vi.fn(async () => ({
-      urlBefore: 'https://example.test/',
-      urlAfter: 'https://example.test/',
-      navigated: false,
-    })),
-    playwrightPerform: vi.fn(async () => ({
-      urlBefore: 'https://example.test/',
-      urlAfter: 'https://example.test/',
-      navigated: false,
-    })),
+    cdpPerform: vi.fn(async () => {
+      seeLock();
+      if (opts.slowDriver) {
+        await tick();
+        await tick();
+      }
+      return stayed();
+    }),
+    playwrightPerform: vi.fn(async () => {
+      seeLock();
+      return stayed();
+    }),
     readValue: vi.fn(async () => 'x'), // matches the fill value used by the tests
   };
   const observer = {
     capture: vi.fn(async () => obs),
-    index: vi.fn(() => undefined),
+    index: vi.fn(() => opts.staleIndex),
     invalidate: vi.fn(),
   };
+  const sessions: any = {
+    withPageLock: vi.fn(async (_sessionId: string, _pageId: string, fn: () => Promise<any>) => await lock.run(fn)),
+    setActivePage: vi.fn(),
+    reconnect: vi.fn(async () => ({})),
+  };
+  const runs = { insert: vi.fn(() => 1) };
   const router = new ActionRouter({
     driver,
     observer,
-    cache: {},
-    model: null,
-    risk: { classify: vi.fn(async () => ({ level: 'low' })) },
-    permissions: { decide: vi.fn(async () => 'allow'), requestConfirmation: vi.fn(async () => 'approve') },
+    sessions,
+    runs,
+    cache: { get: vi.fn(() => null), put: vi.fn(), recordHit: vi.fn(), recordMiss: vi.fn(), invalidate: vi.fn() },
+    risk: { classify: vi.fn(() => ({ risk: 'low' as const, reasons: [] as string[] })) },
+    permissions: {
+      decide: vi.fn((): 'allow' => 'allow'),
+      requestConfirmation: vi.fn(async (): Promise<'approve'> => 'approve'),
+    },
     human: null,
     events: { emit: (e: any) => events.push({ type: e.type, data: e.data }) },
-    recorder: { isRecording: () => false, append: vi.fn(async () => {}) },
+    recorder: { isRecording: () => false, append: vi.fn(), finalize: vi.fn() },
     constants: {},
     disabledTiers: [],
-    ...opts,
   });
-  return { router, driver, observer, events };
+  return { router, driver, observer, sessions, runs, lock, lockSightings, events };
 }
 
 function makeCtx(): any {
@@ -159,6 +229,26 @@ describe('ActionRouter core (P7-02)', () => {
     // requirement 4: an executed action invalidates the cached observation
     expect(observer.invalidate).toHaveBeenCalledWith('p1');
     expect(events.map((e) => e.type)).toEqual(['action.started', 'action.tier', 'action.completed']);
+  });
+
+  it('heals a stale ref by re-matching the old locator against the fresh observation', async () => {
+    // The page re-rendered between capture and click: the old node is gone, the same
+    // button came back under a new ref. This is the heal path, not the miss path.
+    const old = makeObservation('obs_old', [makeElement('e1', 'button', 'Save')]);
+    const { observation, index } = makeObservation('obs_now', [makeElement('e7', 'button', 'Save')]);
+    const { router, driver } = makeRouter({ observation, index }, { staleIndex: old.index });
+
+    const result = await router.execute(
+      { type: 'click', target: { kind: 'ref', observationId: 'obs_old', ref: 'e1' } },
+      makeCtx(),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.tier).toBe('ref');
+    expect(result.element).toMatchObject({ ref: 'e7', role: 'button', name: 'Save' });
+    // the healed element's own backend node, not the stale ref's
+    expect(driver.cdpPerform).toHaveBeenCalledTimes(1);
+    expect(driver.cdpPerform.mock.calls[0][1]).toMatchObject({ backendNodeId: 7 });
   });
 
   it('reports STALE_REF when the old observation is no longer cached', async () => {
@@ -284,6 +374,97 @@ describe('ActionRouter core (P7-02)', () => {
 
     expect(result.ok).toBe(false);
     expect(result.error?.code).toBe('VERIFICATION_FAILED');
+  });
+
+  it('writes one action_runs row per executed action — failures included (§8)', async () => {
+    const { observation, index } = makeObservation('obs1', [makeElement('e1', 'button', 'Save')]);
+    const { router, runs } = makeRouter({ observation, index });
+
+    const ok = await router.execute(
+      { type: 'click', target: { kind: 'query', role: 'button', name: 'Save' } },
+      makeCtx(),
+    );
+    expect(ok.ok).toBe(true);
+    expect(runs.insert).toHaveBeenCalledTimes(1);
+    expect(runs.insert.mock.calls[0][0]).toMatchObject({
+      sessionId: 's1',
+      taskId: null,
+      origin: 'https://example.test',
+    });
+    expect(runs.insert.mock.calls[0][1]).toMatchObject({ ok: true, tier: 'deterministic' });
+
+    // A failure that never reached the driver still leaves its row.
+    const failed = await router.execute(
+      { type: 'click', target: { kind: 'query', role: 'link', name: 'Docs' } },
+      makeCtx(),
+    );
+    expect(failed.ok).toBe(false);
+    expect(runs.insert).toHaveBeenCalledTimes(2);
+    expect(runs.insert.mock.calls[1][1]).toMatchObject({ ok: false });
+    expect(runs.insert.mock.calls[1][1].error?.code).toBe('TARGET_NOT_FOUND');
+  });
+
+  it('runs the whole action inside the session page lock (requirement 4)', async () => {
+    const { observation, index } = makeObservation('obs1', [makeElement('e1', 'button', 'Save')]);
+    const { router, driver, sessions, lockSightings, lock } = makeRouter({ observation, index });
+
+    await router.execute({ type: 'click', target: { kind: 'query', role: 'button', name: 'Save' } }, makeCtx());
+
+    expect(sessions.withPageLock).toHaveBeenCalledWith('s1', 'p1', expect.any(Function));
+    expect(driver.cdpPerform).toHaveBeenCalledTimes(1);
+    expect(lockSightings).toEqual([true]); // the driver call happened with the lock held
+    expect(lock.peak()).toBe(1);
+  });
+
+  it('serializes concurrent actions on the same page instead of interleaving them', async () => {
+    const { observation, index } = makeObservation('obs1', [makeElement('e1', 'button', 'Save')]);
+    const { router, lock } = makeRouter({ observation, index }, { slowDriver: true });
+    const action = { type: 'click' as const, target: { kind: 'query' as const, role: 'button', name: 'Save' } };
+
+    const results = await Promise.all([
+      router.execute(action, makeCtx()),
+      router.execute(action, makeCtx()),
+      router.execute(action, makeCtx()),
+      router.execute(action, makeCtx()),
+    ]);
+
+    expect(results.every((r) => r.ok)).toBe(true);
+    expect(lock.peak()).toBe(1); // never two driver calls in flight at once
+  });
+
+  it('marks the tab it navigated to as the session active page (requirement 7)', async () => {
+    const { router, sessions } = makeRouter(makeObservation('obs1', []));
+
+    const result = await router.execute({ type: 'navigate', url: 'https://example.test/a' }, makeCtx());
+
+    expect(result.pageChanged).toBe(true);
+    expect(sessions.setActivePage).toHaveBeenCalledWith('s1', 'p1');
+  });
+
+  it('follows a tab the action opened into the session', async () => {
+    const { observation, index } = makeObservation('obs1', [makeElement('e1', 'button', 'Save')]);
+    const { router, driver, sessions } = makeRouter({ observation, index });
+    driver.cdpPerform.mockResolvedValue(
+      stayed({ urlAfter: 'https://other.test/', navigated: true, newPageId: 'pg9' }),
+    );
+
+    const result = await router.execute(
+      { type: 'click', target: { kind: 'query', role: 'button', name: 'Save' } },
+      makeCtx(),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.pageChanged).toBe(true);
+    expect(sessions.setActivePage).toHaveBeenCalledWith('s1', 'pg9');
+  });
+
+  it('leaves the active page alone when the action stayed put', async () => {
+    const { observation, index } = makeObservation('obs1', [makeElement('e1', 'button', 'Save')]);
+    const { router, sessions } = makeRouter({ observation, index });
+
+    await router.execute({ type: 'click', target: { kind: 'query', role: 'button', name: 'Save' } }, makeCtx());
+
+    expect(sessions.setActivePage).not.toHaveBeenCalled();
   });
 
   it('keeps the router path well under the 5 ms overhead budget (fake driver, fake observer)', async () => {

@@ -1,95 +1,158 @@
 import type { PageDriver, ResolvedTarget } from '@browser-os/browser';
-import type { EventBus, ValueSource } from '@browser-os/protocol';
-import { ERROR_CODES, type ErrorCode } from '@browser-os/protocol';
-import { BosError } from '../errors.js';
+import type {
+  ActionResult,
+  BrowserAction,
+  EventBus,
+  ExecutionContext,
+  Target,
+  TierAttempt,
+  ValueSource,
+} from '@browser-os/protocol';
+import { ERROR_CODES, type ErrorCode, hasTarget } from '@browser-os/protocol';
+import { BosError, isBosError } from '../errors.js';
+import type { HumanGate, PermissionGate, RiskClassifier } from '../security/interfaces.js';
 import { DEFAULT_ROUTER_CONSTANTS } from './constants.js';
+import { type Aftermath, attempt, crossedBoundary, dispatch, persistRun, settleAfterNavigate, verifyAndSettle } from './execute.js';
 import { resolveQuery } from './resolve-query.js';
 import { resolveRef } from './resolve-ref.js';
-import { pageChanged, settleAfter, toResolvedTarget, verifyAction } from './verify.js';
+import type {
+  ActionCachePort,
+  DisabledTier,
+  ExecuteOptions,
+  ObserverPort,
+  Resolution,
+  RouterCoreDeps,
+  RunPort,
+  SessionsPort,
+  TrajectoryRecorderPort,
+} from './types.js';
+import { toResolvedTarget } from './verify.js';
+
+function newActionId(): string {
+  return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+/**
+ * The copy of the action that goes on the wire (`action.started`). A `secret` value
+ * source carries only its name, so the resolved secret can never ride along; this is
+ * where any further literal-masking rule belongs (action-router §5).
+ */
+function maskAction(action: BrowserAction): BrowserAction {
+  if (action.type !== 'fill' && action.type !== 'select') return action;
+  if (action.value.kind !== 'secret') return action;
+  return { ...action, value: { kind: 'secret', name: action.value.name } };
+}
 
 export class ActionRouter {
   private readonly driver: PageDriver;
-  private readonly observer: any;
-  private readonly cache: any;
-  private readonly model: any;
-  private readonly risk: any;
-  private readonly permissions: any;
-  private readonly human: any;
-  private readonly events: EventBus;
-  private readonly recorder: any;
+  private readonly sessions: SessionsPort;
+  private readonly observer: ObserverPort;
+  private readonly runs: RunPort;
+  private readonly cache: ActionCachePort;
+  private readonly risk: RiskClassifier;
+  private readonly permissions: PermissionGate;
+  private readonly human: HumanGate | null;
+  private readonly events: Pick<EventBus, 'emit'>;
+  private readonly recorder: TrajectoryRecorderPort | null;
   private readonly constants: typeof DEFAULT_ROUTER_CONSTANTS;
-  private readonly disabledTiers: ReadonlyArray<'cache' | 'deterministic' | 'llm'>;
+  private readonly disabledTiers: readonly DisabledTier[];
 
-  constructor(deps: any) {
+  constructor(deps: RouterCoreDeps) {
     this.driver = deps.driver;
+    this.sessions = deps.sessions;
     this.observer = deps.observer;
+    this.runs = deps.runs;
     this.cache = deps.cache;
-    this.model = deps.model;
     this.risk = deps.risk;
     this.permissions = deps.permissions;
     this.human = deps.human;
     this.events = deps.events;
-    this.recorder = deps.recorder;
+    this.recorder = deps.recorder ?? null;
     this.constants = { ...DEFAULT_ROUTER_CONSTANTS, ...deps.constants };
     this.disabledTiers = deps.disabledTiers ?? [];
   }
 
-  async execute(action: any, ctx: any, opts: { healIntent?: string | null } = {}): Promise<any> {
-    const actionId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-    const startedAt = Date.now();
+  /**
+   * action-router §4. The body runs inside the session's per-page lock, so the capture,
+   * the driver call and the settle window of one action can never interleave with another
+   * action on the same page (requirement 4). Only CANCELLED leaves this method as an
+   * exception; every other failure is an `ActionResult { ok: false }` (requirement 2).
+   */
+  async execute(action: BrowserAction, ctx: ExecutionContext, opts: ExecuteOptions = {}): Promise<ActionResult> {
+    const actionId = newActionId();
+    const startedAt = ctx.clock.now();
 
-    const maskAction = (a: any) => {
-      if (!a.target || a.target.kind !== 'fill') return a;
-      const v = a.target as any;
-      if (v.value?.kind === 'secret') {
-        return { ...a, target: { ...v, value: { kind: 'secret', name: v.value.name } } };
-      }
-      return a;
-    };
+    try {
+      return await this.sessions.withPageLock(ctx.sessionId, ctx.pageId, async () =>
+        await this.runAction(action, ctx, opts, actionId, startedAt),
+      );
+    } catch (error) {
+      if (isBosError(error) && error.code === 'CANCELLED') throw error;
+      // Either the lock could not be taken (unknown session or page) or something threw
+      // that should not have: still an ActionResult, and still its action_runs row.
+      return this.finish(actionId, startedAt, ctx, action, { ok: false, error: this.toResultError(error) });
+    }
+  }
 
+  /** Steps A–H of action-router §4, called with the page lock already held. */
+  private async runAction(
+    action: BrowserAction,
+    ctx: ExecutionContext,
+    opts: ExecuteOptions,
+    actionId: string,
+    startedAt: number,
+  ): Promise<ActionResult> {
     this.events.emit({ ts: startedAt, type: 'action.started', data: { actionId, action: maskAction(action) } });
 
     // A. Site access check
     if (await this.checkSiteAccess(ctx, action)) {
-      return this.finish(actionId, startedAt, action, {
+      return this.finish(actionId, startedAt, ctx, action, {
         ok: false,
         error: { code: 'PERMISSION_DENIED', message: 'Site access denied by policy' },
       });
     }
 
     // B. Targetless actions
-    if (!this.hasTarget(action)) {
-      return this.executeTargetless(action, ctx, actionId, startedAt);
-    }
+    if (!hasTarget(action)) return this.executeTargetless(action, ctx, actionId, startedAt);
+    // hasTarget() above guarantees the union member carries a target.
+    const target = ('target' in action ? action.target : undefined) as Target;
 
     // C. Resolve target
-    let resolved: any = null;
-    const attempts: any[] = [];
-
+    let resolved: Resolution;
+    const attempts: TierAttempt[] = [];
     try {
-      resolved = await this.resolveTarget(action, ctx, attempts, opts.healIntent ?? null);
+      resolved = await this.resolveTarget(target, ctx, attempts, opts.healIntent ?? null);
     } catch (error) {
-      if (error instanceof BosError && error.code === 'CANCELLED') throw error;
-      return this.finish(actionId, startedAt, action, { ok: false, error: this.toResultError(error) });
+      if (isBosError(error) && error.code === 'CANCELLED') throw error;
+      return this.finish(actionId, startedAt, ctx, action, { ok: false, error: this.toResultError(error) });
     }
 
-    // D. Security challenge check
-    // This would be checked during resolution; stubbed for now
+    // D. Security challenge check — arrives with the vision tier (P7-04).
 
     // E. Risk + permission
-    const riskResult = await this.risk.classify(action, resolved.element, resolved.url, ctx.policy);
-    const decision = await this.permissions.decide(riskResult, ctx.policy, resolved.origin);
+    const riskResult = this.risk.classify(action, resolved.element, resolved.url, ctx.policy);
+    const decision = this.permissions.decide(riskResult, ctx.policy, resolved.origin);
 
     if (decision === 'deny') {
-      return this.finish(actionId, startedAt, action, {
+      return this.finish(actionId, startedAt, ctx, action, {
         ok: false,
         error: { code: 'PERMISSION_DENIED', message: 'Permission denied by policy' },
       });
     }
     if (decision === 'confirm') {
-      const answer = await this.permissions.requestConfirmation({} as any);
+      const answer = await this.permissions.requestConfirmation({
+        id: `perm_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+        sessionId: ctx.sessionId,
+        taskId: ctx.taskId,
+        action: maskAction(action),
+        risk: riskResult.risk,
+        reasons: riskResult.reasons,
+        element: { role: resolved.element.role, name: resolved.element.name },
+        url: resolved.url,
+        createdAt: ctx.clock.now(),
+      });
       if (answer === 'reject') {
-        return this.finish(actionId, startedAt, action, {
+        return this.finish(actionId, startedAt, ctx, action, {
           ok: false,
           error: { code: 'PERMISSION_DENIED', message: 'Confirmation rejected' },
         });
@@ -102,110 +165,118 @@ export class ActionRouter {
     }
 
     // F. Execute with driver fallback
-    const value = await this.resolveValue(action.value, ctx);
-    const target: ResolvedTarget = toResolvedTarget(resolved);
+    const value = await this.resolveValue('value' in action ? action.value : undefined, ctx);
+    const resolvedTarget: ResolvedTarget = toResolvedTarget(resolved);
+    const actionTimeoutMs = ctx.policy?.budgets?.actionTimeoutMs ?? this.constants.settleMaxMs;
 
-    let driverUsed: 'cdp' | 'playwright' = 'cdp';
-    let driverResult: any;
-
+    let dispatched;
     try {
-      driverResult = await this.driver.cdpPerform(action, target, value);
-    } catch (e) {
-      // Fallback to Playwright only when the failed action provably had no effect (S20).
-      const effect = (e as { effect?: string }).effect;
-      if (effect === 'none') {
-        try {
-          driverResult = await this.driver.playwrightPerform(action, target, value);
-          driverUsed = 'playwright';
-        } catch (fallbackError) {
-          return this.finish(actionId, startedAt, action, {
-            ok: false,
-            error: this.toResultError(fallbackError),
-          });
-        }
-      } else {
-        // effect 'unknown' (or any other claim) is never retried blindly: report and stop.
-        return this.finish(actionId, startedAt, action, { ok: false, error: this.toResultError(e) });
-      }
+      dispatched = await dispatch({ action, target: resolvedTarget, value, driver: this.driver });
+    } catch (error) {
+      // The driver ran (or tried to), so the cached observation for this page is stale.
+      this.observer.invalidate(ctx.pageId);
+      if (isBosError(error) && error.code === 'CANCELLED') throw error;
+      return this.finish(actionId, startedAt, ctx, action, {
+        ok: false,
+        error: this.toResultError(error),
+        url: resolved.url,
+      });
     }
+    this.observer.invalidate(ctx.pageId);
 
-    // Requirement 4: an executed action invalidates the cached observation for this page.
-    this.observer?.invalidate?.(ctx.pageId);
-
-    // G. Verify + settle
-    let changed = pageChanged(
-      driverResult?.urlBefore ?? '',
-      driverResult?.urlAfter ?? '',
-      driverResult?.navigated === true,
-    );
+    // G. Verify + settle, then requirement 7: where the action left the page is where the
+    // session sits next — applied on the failure path too, because the navigation that
+    // happened while verification failed still happened.
+    const changed = crossedBoundary(dispatched.result);
+    let aftermath: Aftermath;
     try {
-      await verifyAction({ action, driver: this.driver, target, value, changed });
-      const actionTimeoutMs = ctx.policy?.budgets?.actionTimeoutMs ?? this.constants.settleMaxMs;
-      await settleAfter(this.driver, this.constants, actionTimeoutMs, changed);
-    } catch (e) {
-      // `execute` never throws except CANCELLED: a failed verification is a failed ActionResult.
-      if (e instanceof BosError && e.code === 'CANCELLED') throw e;
-      return this.finish(actionId, startedAt, action, { ok: false, error: this.toResultError(e) });
+      aftermath = await verifyAndSettle({
+        action,
+        driver: this.driver,
+        target: resolvedTarget,
+        value,
+        driverResult: dispatched.result,
+        changed,
+        constants: this.constants,
+        actionTimeoutMs,
+      });
+    } catch (error) {
+      if (isBosError(error) && error.code === 'CANCELLED') throw error;
+      if (changed) this.markActivePage(ctx, dispatched.result.newPageId ?? ctx.pageId);
+      return this.finish(actionId, startedAt, ctx, action, {
+        ok: false,
+        error: this.toResultError(error),
+        url: aftermathUrl(dispatched.result, resolved),
+        pageChanged: changed,
+      });
     }
+    if (changed) this.markActivePage(ctx, aftermath.newPageId ?? ctx.pageId);
 
     // H. Learn / cache
-    if (action.target.kind === 'intent' && ['deterministic', 'llm', 'vision', 'human'].includes(resolved.tier)) {
-      // Cache learning would go here
+    if (target.kind === 'intent' && ['deterministic', 'llm', 'vision', 'human'].includes(resolved.tier)) {
+      // Cache learning would go here (P7-03).
     }
     if (resolved.tier === 'cache') {
-      // Record cache hit
+      // Record cache hit (P7-03).
     }
 
-    // Record trajectory if recording
-    if (ctx.taskId && this.recorder && this.recorder.isRecording()) {
-      await this.recorder.append({ action, resolved, value, risk: 'low' }, ctx);
-    }
-
-    return this.finish(actionId, startedAt, action, {
+    return this.finish(actionId, startedAt, ctx, action, {
       ok: true,
       action,
       tier: resolved.tier,
-      driver: driverUsed,
+      driver: dispatched.via,
       attempts,
       element: resolved.element,
-      locator: resolved.locator,
-      url: resolved.url,
+      locator: resolved.entry.locator,
+      url: aftermath.url || aftermathUrl(dispatched.result, resolved),
       pageChanged: changed,
-      ms: Date.now() - startedAt,
+      ms: ctx.clock.now() - startedAt,
       llm: { calls: 0, inputTokens: 0, outputTokens: 0 },
-      risk: null,
+      risk: riskResult.risk,
     });
   }
 
-  private hasTarget(action: any): boolean {
-    return 'target' in action && action.target !== undefined;
-  }
-
-  private async checkSiteAccess(ctx: any, action: any): Promise<boolean> {
-    // Stub implementation
-    return false;
-  }
-
-  private async executeTargetless(action: any, ctx: any, actionId: string, startedAt: number): Promise<any> {
+  private async executeTargetless(
+    action: BrowserAction,
+    ctx: ExecutionContext,
+    actionId: string,
+    startedAt: number,
+  ): Promise<ActionResult> {
     if (action.type === 'navigate') {
-      await this.driver.navigate(action.url, action.timeoutMs ?? this.constants.settleMaxMs);
-      await this.driver.settle(this.constants.settleQuietMs, this.constants.settleMaxMs);
-      return this.finish(actionId, startedAt, action, {
+      const actionTimeoutMs = ctx.policy?.budgets?.actionTimeoutMs ?? this.constants.settleMaxMs;
+      const nav = await attempt(() => this.driver.navigate(action.url, this.constants.settleMaxMs));
+      if (!nav.ok) {
+        // Navigation is dispatched, so it is never retried: report what the driver knows.
+        return this.finish(actionId, startedAt, ctx, action, {
+          ok: false,
+          error: {
+            code: nav.error?.code ?? 'NAVIGATION_FAILED',
+            message: nav.error?.message ?? 'The driver could not navigate',
+            ...(nav.effect !== 'none' ? { details: { effect: nav.effect } } : {}),
+          },
+          url: nav.urlAfter || action.url,
+          pageChanged: crossedBoundary(nav),
+        });
+      }
+      const changed = crossedBoundary(nav);
+      await settleAfterNavigate(this.driver, this.constants, actionTimeoutMs);
+      if (changed) this.markActivePage(ctx, nav.newPageId ?? ctx.pageId);
+      return this.finish(actionId, startedAt, ctx, action, {
         ok: true,
         action,
         tier: null,
         driver: 'cdp',
         attempts: [],
-        url: action.url,
-        pageChanged: true,
-        ms: Date.now() - startedAt,
+        url: nav.urlAfter || action.url,
+        pageChanged: changed,
+        ms: ctx.clock.now() - startedAt,
         llm: { calls: 0, inputTokens: 0, outputTokens: 0 },
         risk: null,
       });
     }
     if (action.type === 'wait') {
       await new Promise((resolve) => setTimeout(resolve, action.timeoutMs ?? 1000));
-      return this.finish(actionId, startedAt, action, {
+      return this.finish(actionId, startedAt, ctx, action, {
         ok: true,
         action,
         tier: null,
@@ -213,20 +284,23 @@ export class ActionRouter {
         attempts: [],
         url: '',
         pageChanged: false,
-        ms: Date.now() - startedAt,
+        ms: ctx.clock.now() - startedAt,
         llm: { calls: 0, inputTokens: 0, outputTokens: 0 },
         risk: null,
       });
     }
-    return this.finish(actionId, startedAt, action, {
+    return this.finish(actionId, startedAt, ctx, action, {
       ok: false,
       error: { code: 'INVALID_REQUEST', message: `Unknown targetless action ${action.type}` },
     });
   }
 
-  private async resolveTarget(action: any, ctx: any, attempts: any[], healIntent: string | null): Promise<any> {
-    const target = action.target;
-
+  private async resolveTarget(
+    target: Target,
+    ctx: ExecutionContext,
+    attempts: TierAttempt[],
+    healIntent: string | null,
+  ): Promise<Resolution> {
     switch (target.kind) {
       case 'ref':
         return this.resolveRefTarget(target, ctx, attempts);
@@ -237,11 +311,15 @@ export class ActionRouter {
       case 'intent':
         return this.resolveIntentTarget(target, ctx, attempts, healIntent);
       default:
-        throw new Error(`Unknown target kind: ${(target as any).kind}`);
+        throw new BosError('INVALID_REQUEST', `Unknown target kind: ${String((target as Target).kind)}`);
     }
   }
 
-  private async resolveRefTarget(target: any, ctx: any, attempts: any[]): Promise<any> {
+  private async resolveRefTarget(
+    target: Extract<Target, { kind: 'ref' }>,
+    ctx: ExecutionContext,
+    attempts: TierAttempt[],
+  ): Promise<Resolution> {
     const { observation, index } = await this.observer.capture(ctx.sessionId, ctx.pageId);
     const staleIndex = this.observer.index(target.observationId) ?? null;
     const resolution = resolveRef({
@@ -256,28 +334,41 @@ export class ActionRouter {
     return resolution;
   }
 
-  private async resolveLocatorTarget(target: any, ctx: any, attempts: any[]): Promise<any> {
+  private async resolveLocatorTarget(
+    _target: Extract<Target, { kind: 'locator' }>,
+    _ctx: ExecutionContext,
+    _attempts: TierAttempt[],
+  ): Promise<Resolution> {
     // Locator tier arrives with P7-03 (intent/locator tiers are out of P7-02 scope).
     throw new BosError('TARGET_NOT_FOUND', 'Locator resolution not implemented');
   }
 
-  private async resolveQueryTarget(target: any, ctx: any, attempts: any[]): Promise<any> {
+  private async resolveQueryTarget(
+    target: Extract<Target, { kind: 'query' }>,
+    ctx: ExecutionContext,
+    attempts: TierAttempt[],
+  ): Promise<Resolution> {
     const { observation, index } = await this.observer.capture(ctx.sessionId, ctx.pageId);
     const resolution = resolveQuery(observation, index, target);
     attempts.push({ tier: 'deterministic', ok: true, ms: 0 });
     return resolution;
   }
 
-  private async resolveIntentTarget(target: any, ctx: any, attempts: any[], healIntent: string | null): Promise<any> {
+  private async resolveIntentTarget(
+    _target: Extract<Target, { kind: 'intent' }>,
+    _ctx: ExecutionContext,
+    _attempts: TierAttempt[],
+    _healIntent: string | null,
+  ): Promise<Resolution> {
     throw new BosError('TARGET_NOT_FOUND', 'Intent resolution not implemented');
   }
 
-  private async resolveValue(value: ValueSource | undefined, ctx: any): Promise<string | undefined> {
+  private async resolveValue(value: ValueSource | undefined, ctx: ExecutionContext): Promise<string | undefined> {
     if (value === undefined) return undefined; // click / hover / press carry no value
     if (value.kind === 'literal') return value.value;
     if (value.kind === 'param') return ctx.params[value.name] ?? '';
     if (value.kind === 'secret') return await ctx.secrets.resolve(value.name);
-    throw new Error(`Unknown value source: ${(value as any).kind}`);
+    throw new Error(`Unknown value source: ${String((value as ValueSource).kind)}`);
   }
 
   /**
@@ -309,8 +400,18 @@ export class ActionRouter {
     return Object.keys(details).length > 0 ? { code, message, details } : { code, message };
   }
 
-  private finish(actionId: string, startedAt: number, action: any, result: any): any {
-    const built = {
+  /**
+   * Builds the ActionResult, writes its `action_runs` row (requirement 1, §8) and emits
+   * `action.completed`. Every exit of `execute` goes through here, success or not.
+   */
+  private finish(
+    actionId: string,
+    startedAt: number,
+    ctx: ExecutionContext,
+    action: BrowserAction,
+    result: Partial<ActionResult> & { ok: boolean; error?: ActionResult['error'] },
+  ): ActionResult {
+    const built: ActionResult = {
       ok: result.ok,
       action,
       tier: result.tier ?? null,
@@ -321,12 +422,43 @@ export class ActionRouter {
       url: result.url ?? '',
       pageChanged: result.pageChanged ?? false,
       extracted: result.extracted,
-      ms: Date.now() - startedAt,
+      ms: ctx.clock.now() - startedAt,
       llm: { calls: 0, inputTokens: 0, outputTokens: 0 },
       risk: result.risk ?? null,
       error: result.error,
     };
-    this.events.emit({ ts: Date.now(), type: 'action.completed', data: { actionId, result: built } });
+
+    persistRun(this.runs, ctx, built);
+
+    // P7-05: a trajectory records what reached the risk gate; failures before it are not in it.
+    if (ctx.taskId !== null && this.recorder !== null && this.recorder.isRecording() && built.risk !== null) {
+      this.recorder.append(built, ctx, null, built.risk);
+    }
+
+    this.events.emit({ ts: ctx.clock.now(), type: 'action.completed', data: { actionId, result: built } });
     return built;
   }
+
+  private async checkSiteAccess(_ctx: ExecutionContext, _action: BrowserAction): Promise<boolean> {
+    // Stub implementation (P7-01 hands over the site allow/deny list with the policy).
+    return false;
+  }
+
+  /**
+   * Requirement 7 (integration §5): an action that crossed a navigation boundary becomes
+   * the session's active page, so the next capture and the next action land on the tab the
+   * agent is actually looking at.
+   */
+  private markActivePage(ctx: ExecutionContext, pageId: string): void {
+    try {
+      this.sessions.setActivePage(ctx.sessionId, pageId);
+    } catch {
+      // A session that has already gone away must not turn a delivered action into a failure.
+    }
+  }
+}
+
+/** Post-action URL: what the driver saw, falling back to where it was acting. */
+function aftermathUrl(result: { urlAfter?: string }, resolved: Resolution): string {
+  return result.urlAfter || resolved.url;
 }

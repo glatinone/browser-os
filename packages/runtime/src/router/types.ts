@@ -5,7 +5,7 @@
 // reference so router tests can substitute in-memory fakes for SessionManager,
 // ActionCacheStore, RunStore and the P7-01 security stubs.
 
-import type { PageDriver } from '@browser-os/browser';
+import type { PageDriver, ResolvedTarget } from '@browser-os/browser';
 import type {
   ActionResult,
   BrowserAction,
@@ -118,7 +118,11 @@ export interface TrajectoryRecorderPort {
 export interface Resolution {
   tier: Tier;
   entry: IndexEntry;
-  element: { ref: string | null; role: string; name: string; context: string[] };
+  element: { ref: string; role: string; name: string; context: string[] };
+  /** URL of the observation this target was resolved from (verify/settle compare against it). */
+  url: string;
+  /** Origin of `url` — the shape `decide()` and `classify()` ask for (integration §5). */
+  origin: string;
   /** Resolved element is known but disabled — the driver must not be called for click/fill/select/upload. */
   disabled: boolean;
 }
@@ -146,8 +150,19 @@ export function buildResolution(tier: Tier, observation: Observation, ref: strin
       name: element?.name ?? entry.locator.name,
       context: element?.context ?? entry.locator.context,
     },
+    url: observation.url,
+    origin: originOfUrl(observation.url),
     disabled: element?.state.disabled === true,
   };
+}
+
+/** `''` when `url` is not absolute (a relative observation URL has no origin to classify against). */
+export function originOfUrl(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return '';
+  }
 }
 
 export type DisabledTier = 'cache' | 'deterministic' | 'llm';
@@ -188,6 +203,33 @@ export interface RouterDeps {
   cache: ActionCachePort;
   clock: Clock;
   events?: EventBus;
+  /** P7-05; absent in P7-02 and in most tests. */
+  recorder?: TrajectoryRecorderPort | null;
+  /** Benchmark ablation only (P10-02): tiers skipped by the ladder. */
+  disabledTiers?: readonly DisabledTier[];
+  /** Per-construction override of `DEFAULT_ROUTER_CONSTANTS`. */
+  constants?: Partial<RouterConstants>;
+}
+
+/**
+ * What the P7-02 router consumes today: a structural subset of `RouterDeps` that leaves
+ * out the ports the later tiers own. `driver` stands in for `pages.context()` (P7-07
+ * wires that), `models`/`vision` arrive with P7-03/P7-04, `clock` is read off the
+ * `ExecutionContext` per action, and `human` may still be `null` while the human tier is
+ * unwired. Every name shared with `RouterDeps` is the *same* type, so P7-07 widens this
+ * contract instead of rewriting the router against it.
+ */
+export interface RouterCoreDeps {
+  driver: PageDriver;
+  sessions: SessionsPort;
+  observer: ObserverPort;
+  risk: RiskClassifier;
+  permissions: PermissionGate;
+  human: HumanGate | null;
+  runs: RunPort;
+  cache: ActionCachePort;
+  /** The router only emits; a full `EventBus` satisfies it. */
+  events: Pick<EventBus, 'emit'>;
   /** P7-05; absent in P7-02 and in most tests. */
   recorder?: TrajectoryRecorderPort | null;
   /** Benchmark ablation only (P10-02): tiers skipped by the ladder. */
