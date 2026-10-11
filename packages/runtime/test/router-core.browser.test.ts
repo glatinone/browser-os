@@ -230,4 +230,53 @@ describe('ActionRouter core (P7-02, browser)', () => {
       expect((await manager.reconnect(session.id)).status).toBe('ready');
     });
   });
+
+  it('heals a stale ref after a real re-render: the old node is gone, the same field comes back', async () => {
+    await withFixtureServer(async (server) => {
+      const session = await manager.open({ profileName: 'router' });
+      sessionId = session.id;
+      const page = await manager.newPage(session.id, `${server.baseUrl}/basic/index.html`);
+      const { router, observer } = makeRouter(page.id);
+
+      // Capture #1: the ref we will hold on to.
+      const { observation: first } = await observer.capture(session.id, page.id);
+      const before = first.elements.find((e) => e.role === 'textbox' && e.name === 'Full name');
+      expect(before).toBeDefined();
+      const staleObservationId = first.id;
+      const staleRef = before!.ref;
+
+      // The page re-renders (framework swap): the old input node is destroyed and an
+      // identical one appears in its place — new backendNodeId, fresh observation id.
+      const cdp = await manager.page(session.id, page.id).cdp();
+      await cdp.send('Runtime.evaluate', {
+        expression:
+          "(() => { const old = document.getElementById('name'); const fresh = old.cloneNode(true); fresh.value = ''; old.replaceWith(fresh); })()",
+      });
+
+      // Execute against the destroyed node's ref: step A captures fresh (mutation
+      // counter moved), the stale index still holds the old locator, and the heal
+      // path re-matches role+name onto the replacement node.
+      const result = await router.execute(
+        {
+          type: 'fill',
+          target: { kind: 'ref', observationId: staleObservationId, ref: staleRef },
+          value: { kind: 'literal', value: 'Kiell' },
+        },
+        makeCtx(page.id),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.tier).toBe('ref');
+      // The value landed in the *replacement* node, which only the heal path reaches.
+      const { observation: fresh } = await observer.capture(session.id, page.id);
+      expect(fresh.id).not.toBe(staleObservationId);
+      const field = fresh.elements.find((e) => e.role === 'textbox' && e.name === 'Full name');
+      expect(field?.value).toBe('Kiell');
+
+      expect(actionRuns()).toEqual([
+        expect.objectContaining({ action_type: 'fill', tier: 'ref', driver: 'cdp', ok: 1, error_code: null }),
+      ]);
+      expect((await manager.reconnect(session.id)).status).toBe('ready');
+    });
+  });
 });
