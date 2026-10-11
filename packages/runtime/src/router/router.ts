@@ -12,7 +12,15 @@ import { ERROR_CODES, type ErrorCode, hasTarget } from '@browser-os/protocol';
 import { BosError, isBosError } from '../errors.js';
 import type { HumanGate, PermissionGate, RiskClassifier } from '../security/interfaces.js';
 import { DEFAULT_ROUTER_CONSTANTS } from './constants.js';
-import { type Aftermath, attempt, crossedBoundary, dispatch, persistRun, settleAfterNavigate, verifyAndSettle } from './execute.js';
+import {
+  type Aftermath,
+  attempt,
+  crossedBoundary,
+  dispatch,
+  persistRun,
+  settleAfterNavigate,
+  verifyAndSettle,
+} from './execute.js';
 import { resolveQuery } from './resolve-query.js';
 import { resolveRef } from './resolve-ref.js';
 import type {
@@ -83,8 +91,10 @@ export class ActionRouter {
     const startedAt = ctx.clock.now();
 
     try {
-      return await this.sessions.withPageLock(ctx.sessionId, ctx.pageId, async () =>
-        await this.runAction(action, ctx, opts, actionId, startedAt),
+      return await this.sessions.withPageLock(
+        ctx.sessionId,
+        ctx.pageId,
+        async () => await this.runAction(action, ctx, opts, actionId, startedAt),
       );
     } catch (error) {
       if (isBosError(error) && error.code === 'CANCELLED') throw error;
@@ -169,7 +179,7 @@ export class ActionRouter {
     const resolvedTarget: ResolvedTarget = toResolvedTarget(resolved);
     const actionTimeoutMs = ctx.policy?.budgets?.actionTimeoutMs ?? this.constants.settleMaxMs;
 
-    let dispatched;
+    let dispatched: Awaited<ReturnType<typeof dispatch>>;
     try {
       dispatched = await dispatch({ action, target: resolvedTarget, value, driver: this.driver });
     } catch (error) {

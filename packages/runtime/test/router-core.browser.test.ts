@@ -2,16 +2,16 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { type BrowserProvider, CdpEndpointProvider, ensureProfileDir, LaunchProvider } from '@browser-os/browser';
-import { RunStore, openStore, type Store } from '@browser-os/memory';
+import { openStore, RunStore, type Store } from '@browser-os/memory';
 import { type BrowserProfile, DEFAULT_POLICY, EventBus } from '@browser-os/protocol';
 import { dummyProfile, withFixtureServer } from '@browser-os/tests/helpers';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Observer } from '../src/observer/observer.js';
 import { createExecutionContext } from '../src/router/context.js';
 import { ActionRouter } from '../src/router/router.js';
-import { type ProviderKind, SessionManager } from '../src/sessions/session-manager.js';
-import { PolicyPermissionGate, StaticRiskClassifier } from '../src/security/stubs.js';
 import type { SessionsPort } from '../src/router/types.js';
+import { PolicyPermissionGate, StaticRiskClassifier } from '../src/security/stubs.js';
+import { type ProviderKind, SessionManager } from '../src/sessions/session-manager.js';
 
 /**
  * P7-02 against a real Chromium: real PageDriver, real Observer, the *real*
@@ -129,10 +129,7 @@ describe('ActionRouter core (P7-02, browser)', () => {
       const page = await manager.newPage(session.id, `${server.baseUrl}/basic/index.html`);
       const { router } = makeRouter(page.id);
 
-      const result = await router.execute(
-        { type: 'navigate', url: `${server.baseUrl}/basic/docs` },
-        makeCtx(page.id),
-      );
+      const result = await router.execute({ type: 'navigate', url: `${server.baseUrl}/basic/docs` }, makeCtx(page.id));
 
       expect(result.ok).toBe(true);
       expect(result.pageChanged).toBe(true);
@@ -222,7 +219,13 @@ describe('ActionRouter core (P7-02, browser)', () => {
       expect(observation.url).toContain('/basic/docs');
 
       expect(actionRuns()).toEqual([
-        expect.objectContaining({ action_type: 'click', tier: 'deterministic', driver: 'cdp', ok: 1, error_code: null }),
+        expect.objectContaining({
+          action_type: 'click',
+          tier: 'deterministic',
+          driver: 'cdp',
+          ok: 1,
+          error_code: null,
+        }),
       ]);
       expect((await manager.reconnect(session.id)).status).toBe('ready');
     });

@@ -124,10 +124,7 @@ interface MakeRouterOpts {
   slowDriver?: boolean;
 }
 
-function makeRouter(
-  obs: { observation: Observation; index: ObservationIndex },
-  opts: MakeRouterOpts = {},
-): Fakes {
+function makeRouter(obs: { observation: Observation; index: ObservationIndex }, opts: MakeRouterOpts = {}): Fakes {
   const events: Array<{ type: string; data: any }> = [];
   const lock = makePageLock();
   const lockSightings: boolean[] = [];
@@ -444,9 +441,7 @@ describe('ActionRouter core (P7-02)', () => {
   it('follows a tab the action opened into the session', async () => {
     const { observation, index } = makeObservation('obs1', [makeElement('e1', 'button', 'Save')]);
     const { router, driver, sessions } = makeRouter({ observation, index });
-    driver.cdpPerform.mockResolvedValue(
-      stayed({ urlAfter: 'https://other.test/', navigated: true, newPageId: 'pg9' }),
-    );
+    driver.cdpPerform.mockResolvedValue(stayed({ urlAfter: 'https://other.test/', navigated: true, newPageId: 'pg9' }));
 
     const result = await router.execute(
       { type: 'click', target: { kind: 'query', role: 'button', name: 'Save' } },
