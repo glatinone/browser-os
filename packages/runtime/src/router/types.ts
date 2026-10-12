@@ -35,6 +35,13 @@ export interface PageContext {
   worlds: HelperWorlds;
   mainCdpFrameId: string;
   headless: boolean;
+  /**
+   * The page's current URL, when the builder knows it. The intent cache query
+   * (action-router §5) is keyed on origin + path template, and reading it here is
+   * what lets tier 1 answer without paying for an observation; absent → `''`,
+   * which turns every cache lookup into a miss rather than a wrong hit.
+   */
+  url?: string;
 }
 
 /**
@@ -125,6 +132,13 @@ export interface Resolution {
   origin: string;
   /** Resolved element is known but disabled — the driver must not be called for click/fill/select/upload. */
   disabled: boolean;
+  /**
+   * Set only by the intent ladder (§5) and never by ref/locator/query targets,
+   * which do not write to the action cache. Step H needs it after the action
+   * verified: `query` to learn a fresh resolution into (memory §4.2), `key` of
+   * the tier-1 entry that answered — hit → `recordHit`, false hit → `invalidate`.
+   */
+  intentLearning?: { query: ActionCacheQuery; key: string | null };
 }
 
 /** A resolution plus the observation it was derived from (needed for verify and settle). */
@@ -213,14 +227,15 @@ export interface RouterDeps {
 
 /**
  * What the P7-02 router consumes today: a structural subset of `RouterDeps` that leaves
- * out the ports the later tiers own. `driver` stands in for `pages.context()` (P7-07
- * wires that), `models`/`vision` arrive with P7-03/P7-04, `clock` is read off the
- * `ExecutionContext` per action, and `human` may still be `null` while the human tier is
- * unwired. Every name shared with `RouterDeps` is the *same* type, so P7-07 widens this
- * contract instead of rewriting the router against it.
+ * out the ports the later tiers own. `pages` provides `PageContext` for probe access,
+ * `driver` is used for action execution, `models`/`vision` arrive with P7-03/P7-04,
+ * `clock` is read off the `ExecutionContext` per action, and `human` may still be `null`
+ * while the human tier is unwired. Every name shared with `RouterDeps` is the *same* type,
+ * so P7-07 widens this contract instead of rewriting the router against it.
  */
 export interface RouterCoreDeps {
   driver: PageDriver;
+  pages: PagesPort;
   sessions: SessionsPort;
   observer: ObserverPort;
   risk: RiskClassifier;
