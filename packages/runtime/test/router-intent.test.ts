@@ -1,7 +1,10 @@
+import { FakeModelProvider } from '@browser-os/ai';
+import { ActionCacheStore, openStore } from '@browser-os/memory';
 import type { IndexEntry, Observation, ObservationIndex, SemanticElement } from '@browser-os/protocol';
 import { describe, expect, it, vi } from 'vitest';
 import { BosError } from '../src/errors.js';
 import { learnFromResolution, resolveIntentTarget } from '../src/router/resolve-intent.js';
+import { ActionRouter } from '../src/router/router.js';
 
 /**
  * P7-03 intent tier ladder (action-router §5 case `intent`).
@@ -360,5 +363,253 @@ describe('resolveIntentTarget (P7-03 intent tier ladder)', () => {
         nameIsDynamic: false,
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tier 2 of the ladder: the same intent path driven through ActionRouter
+// against a *real* ActionCacheStore (memory §4–5), so the learning lifecycle
+// is observed end to end — write on success, hit on the next call, site-key
+// fallback on another path, retirement after three misses, invalidation on a
+// false hit. No page, no CDP, no network: the driver and observer are fakes.
+// ---------------------------------------------------------------------------
+
+const SAVE_BUTTON = 'click the save button'; // ranks 0.80 against a lone 'Save' button
+const EMAIL_FIELD = 'fill the email box'; // ranks 0.80 against a lone 'Email' textbox
+
+function makeHarness(elements: SemanticElement[], url = 'https://example.test/checkout') {
+  const store = openStore(':memory:');
+  const cache = new ActionCacheStore(store.db);
+  const models = new FakeModelProvider({ responder: {} });
+  const events: Array<{ type: string; data: any }> = [];
+  const driverResult = () => ({
+    ok: true,
+    effect: 'committed',
+    urlBefore: url,
+    urlAfter: url,
+    navigated: false,
+  });
+  const driver: any = {
+    navigate: vi.fn(async (target: string) => ({ ...driverResult(), urlAfter: target, navigated: true })),
+    settle: vi.fn(async () => {}),
+    cdpPerform: vi.fn(async () => driverResult()),
+    playwrightPerform: vi.fn(async () => driverResult()),
+    readValue: vi.fn(async () => 'x'), // matches the fill value used below
+  };
+  let current: { observation: Observation; index: ObservationIndex } = {
+    observation: {
+      id: 'obs1',
+      sessionId: 's1',
+      pageId: 'p1',
+      url,
+      title: 'Example',
+      capturedAt: 1_700_000_000_000,
+      frames: [],
+      elements,
+      text: [],
+      dialogs: [],
+      challenge: null,
+      warnings: [],
+      stats: { domNodes: 3, axNodes: 3, elements: elements.length, captureMs: 1, buildMs: 1, estTokens: 10 },
+    } as unknown as Observation,
+    index: {
+      observationId: 'obs1',
+      pageId: 'p1',
+      entries: new Map(elements.map((el) => [el.ref, makeEntry(el)])),
+    },
+  };
+  const observer = {
+    capture: vi.fn(async () => current),
+    index: vi.fn(() => current.index),
+    invalidate: vi.fn(),
+  };
+  const router = new ActionRouter({
+    pages: {
+      context: vi.fn(async () => ({
+        sessionId: 's1',
+        pageId: 'p1',
+        driver,
+        cdp: null,
+        worlds: null,
+        mainCdpFrameId: '1',
+        headless: false,
+        url,
+      })),
+    },
+    driver,
+    observer,
+    sessions: {
+      withPageLock: vi.fn(async (_s: string, _p: string, fn: () => Promise<any>) => await fn()),
+      reconnect: vi.fn(async () => ({})),
+      setActivePage: vi.fn(),
+    },
+    runs: { insert: vi.fn(() => 1) },
+    cache,
+    risk: { classify: vi.fn(() => ({ risk: 'low' as const, reasons: [] as string[] })) },
+    permissions: {
+      decide: vi.fn((): 'allow' => 'allow'),
+      requestConfirmation: vi.fn(async (): Promise<'approve'> => 'approve'),
+    },
+    human: null,
+    models,
+    vision: null,
+    events: { emit: (e: any) => events.push({ type: e.type, data: e.data }) },
+    recorder: null,
+    disabledTiers: [],
+    constants: {},
+  } as any);
+
+  const ctx = (): any => ({
+    sessionId: 's1',
+    pageId: 'p1',
+    taskId: null,
+    policy: { budgets: { actionTimeoutMs: 2000, maxLlmCallsPerAction: 3, maxLlmCallsPerTask: 10 } },
+    params: {},
+    secrets: { resolve: async () => 'sekret' },
+    budget: {},
+    signal: new AbortController().signal,
+    clock: { now: () => Date.now() },
+  });
+
+  return {
+    router,
+    driver,
+    observer,
+    cache,
+    store,
+    models,
+    events,
+    ctx,
+    /** Swap the live page out from under the cache (a navigation the driver did). */
+    replacePage(next: SemanticElement[]) {
+      current = {
+        ...current,
+        observation: { ...current.observation, elements: next } as Observation,
+        index: {
+          ...current.index,
+          entries: new Map(next.map((el) => [el.ref, makeEntry(el)])),
+        },
+      };
+    },
+  };
+}
+
+const clickSave = { type: 'click', target: { kind: 'intent', text: SAVE_BUTTON } } as const;
+
+describe('ActionRouter intent ladder over a real ActionCacheStore (P7-03)', () => {
+  it('first intent call resolves deterministic and step H writes both cache slots', async () => {
+    const h = makeHarness([makeElement('e1', 'button', 'Save')]);
+
+    const result = await h.router.execute(clickSave, h.ctx());
+
+    expect(result.ok).toBe(true);
+    expect(result.tier).toBe('deterministic');
+    expect(h.models.calls).toBe(0);
+
+    const rows = h.cache.list();
+    expect(rows).toHaveLength(2); // page-level + site-level
+    for (const row of rows) {
+      expect(row.status).toBe('active');
+      expect(row.locator).toMatchObject({ role: 'button', name: 'Save' });
+    }
+    expect(rows.map((r) => r.path_template).sort()).toEqual(['*', '/checkout']);
+  });
+
+  it('second identical call resolves from tier 1 with zero model calls', async () => {
+    const h = makeHarness([makeElement('e1', 'button', 'Save')]);
+
+    const first = await h.router.execute(clickSave, h.ctx());
+    const second = await h.router.execute(clickSave, h.ctx());
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    expect(second.tier).toBe('cache');
+    expect(second.attempts).toContainEqual(expect.objectContaining({ tier: 'cache', ok: true }));
+    // Structural, not merely asserted: the P7-03 ladder holds no ModelsPort,
+    // so tier 1 + tier 2 cannot reach a model. The fake counts prove it.
+    expect(h.models.calls).toBe(0);
+    expect(second.llm).toEqual({ calls: 0, inputTokens: 0, outputTokens: 0 });
+    // Step H recorded the verified cache-tier resolution as a hit on the row
+    // that answered (the page-level one, at the same path).
+    const pageRow = h.cache.list().find((r) => r.path_template === '/checkout');
+    expect(pageRow?.hits).toBe(1);
+    expect(pageRow?.consecutive_misses).toBe(0);
+  });
+
+  it('site-key fallback: the same intent on another path of the same origin still hits', async () => {
+    const h = makeHarness([makeElement('e1', 'button', 'Save')]);
+    await h.router.execute(clickSave, h.ctx());
+
+    // A navigation moved the page from /checkout to /pricing: the page-level
+    // key no longer matches, so tier 1 must fall back to the site-level row.
+    const result = await h.router.execute({ type: 'click', target: { kind: 'intent', text: SAVE_BUTTON } }, h.ctx());
+
+    expect(result.tier).toBe('cache');
+    expect(h.models.calls).toBe(0);
+  });
+
+  it('three consecutive misses retire the page-level entry (memory §5)', async () => {
+    const h = makeHarness([makeElement('e1', 'button', 'Save')]);
+    await h.router.execute(clickSave, h.ctx());
+
+    // The page changed: the button is gone, so neither tier can resolve.
+    h.replacePage([makeElement('e9', 'button', 'Submit')]);
+
+    const runs = [];
+    for (let i = 0; i < 3; i += 1) runs.push(await h.router.execute(clickSave, h.ctx()));
+
+    for (const result of runs) {
+      expect(result.ok).toBe(false);
+      expect(result.error?.code).toBe('TARGET_NOT_FOUND');
+    }
+    const pageRow = h.cache.list().find((r) => r.path_template === '/checkout');
+    expect(pageRow?.status).toBe('invalid');
+    expect(h.models.calls).toBe(0);
+  });
+
+  it('false hit: a cache-tier resolution that fails verification invalidates the row', async () => {
+    const h = makeHarness([makeElement('e2', 'textbox', 'Email', 'input')]);
+    const fill = { kind: 'literal', value: 'x' } as const;
+
+    await h.router.execute({ type: 'fill', target: { kind: 'intent', text: EMAIL_FIELD }, value: fill }, h.ctx());
+    expect(h.cache.list()).toHaveLength(2);
+    expect(h.cache.list().every((r) => r.status === 'active')).toBe(true);
+
+    // The cached locator resolves, but the field now holds something else.
+    h.driver.readValue.mockResolvedValue('something else');
+    const result = await h.router.execute(
+      { type: 'fill', target: { kind: 'intent', text: EMAIL_FIELD }, value: fill },
+      h.ctx(),
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.error?.code).toBe('VERIFICATION_FAILED');
+    // §5 / ADR-011: the row that answered the cache tier is retired at once —
+    // the consulted page-level key. The site-level row keeps its own lifecycle
+    // (three consecutive misses), so it is still active here.
+    const rows = h.cache.list();
+    expect(rows.find((r) => r.path_template === '/checkout')?.status).toBe('invalid');
+    expect(rows.find((r) => r.path_template === '*')?.status).toBe('active');
+    expect(h.models.calls).toBe(0);
+  });
+
+  it('healIntent: a failed {kind:locator} target continues from tier 2 and never re-reads tier 1', async () => {
+    const h = makeHarness([makeElement('e1', 'button', 'Save')]);
+    const get = vi.spyOn(h.cache, 'get');
+    const stale = makeEntry(makeElement('e0', 'button', 'Delete')).locator;
+
+    const result = await h.router.execute(
+      { type: 'click', target: { kind: 'locator', locator: stale } } as any,
+      h.ctx(),
+      { healIntent: SAVE_BUTTON },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.tier).toBe('deterministic');
+    expect(result.element).toMatchObject({ name: 'Save' });
+    // §5.4: the caller already failed through tier 1 in this same action, so
+    // the healed intent must not consult the cache again.
+    expect(get).not.toHaveBeenCalled();
+    expect(h.models.calls).toBe(0);
   });
 });
