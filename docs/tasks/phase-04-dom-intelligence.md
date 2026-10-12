@@ -67,6 +67,16 @@ Reading note for reviewers: the `text` reporter runs with `skipFull`, so a file 
 **Implementation notes**
 Recorded all 10 non-heavy fixture pages and added selector truth maps. Browser capture tests cover the main frame, child iframe, and per-frame AX timeout isolation. Status is `review` because the task card requires review supervision.
 
+**Review verdict (STA-160, 2026-10-12, run afe3b38f): PASS → `done`.**
+Provenance: this card states no `port: allowed`; the P4-02 files (`packages/dom/src/capture.ts`,
+`src/types-raw.ts`, `scripts/record-capture.ts`, `test/capture.browser.test.ts`) contain no port or
+"adapted from" markers, so `THIRD_PARTY_NOTICES.md` §1 correctly reads "None yet". AC: raw fixtures
+committed for all non-heavy pages — `git ls-files` shows 12 top-level `*.raw.json` plus 9 under
+`mutations/`; only `heavy` is absent, as the card requires. `pnpm build` and `pnpm -r typecheck`
+green; `pnpm test` 590 passed; `pnpm test:browser` 74 passed incl. the 4 capture tests
+(main-frame nodes/layout/AX, child iframe AX, `frameAxTimeoutMs: 0` frame-omission warning,
+live-vs-golden contract). `biome check` on the four P4-02 files: clean.
+
 ---
 
 ## P4-03 · Join → NodeTable

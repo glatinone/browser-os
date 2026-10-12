@@ -35,16 +35,22 @@ assertion.**
 | P4-09 | probe round-trip budget assertions |
 | P5-05 | prompt carries the untrusted-data framing sentence |
 
+Promoted later, 2026-10-12, by expert review **STA-160** (Engineering 3, run `afe3b38f`): its AC is
+not a test assertion but a provenance check, and it now passes — see the table below.
+
+| Promoted to `done` | Why |
+|---|---|
+| P4-02 | AC "raw fixtures committed for all non-heavy fixture pages" holds (21 `*.raw.json` tracked: 12 top-level + 9 `mutations/`, only `heavy` absent as the card requires) and the provenance gate passes: the card states no `port: allowed`, the P4-02 files carry no port/adaptation markers, and `THIRD_PARTY_NOTICES.md` correctly reads "None yet". `pnpm build`, `pnpm -r typecheck`, `pnpm test` (590 passed) and `pnpm test:browser` (74 passed) all green. |
+
 | Stays in `review` | Why the decision keeps it there |
 |---|---|
-| P4-02 | provenance — predates this session, no `port: allowed`, `THIRD_PARTY_NOTICES.md` reads "None yet" |
 | P4-03 | supervision `expert` **and** provenance |
 | P4-05 | judgment — 12 goldens define later phases; card requires human/expert review |
 | P4-08 | supervision `expert` |
 | P5-01 | AC needs Phase 7 router tests, which do not exist yet |
 | P5-02 | AC needs a manual Ollama run; not installed here |
 
-Phase 7 work proceeds in parallel: these six are inputs Phase 7 reads but does not modify.
+Phase 7 work proceeds in parallel: these five are inputs Phase 7 reads but does not modify.
 
 ---
 
@@ -80,7 +86,7 @@ Phase 7 work proceeds in parallel: these six are inputs Phase 7 reads but does n
 | P3-07 | **M1** e2e "Hands" | P2-07, P3-02, P3-03, P3-04, P3-05 | cheap | done |
 | **Phase 4** | **DOM intelligence** | | | |
 | P4-01 | Text normalization utilities | P1-04 | cheap | done |
-| P4-02 | Raw capture + capture recorder script | P2-03, P3-05, P4-01 | review | review |
+| P4-02 | Raw capture + capture recorder script | P2-03, P3-05, P4-01 | review | done |
 | P4-03 | Join → NodeTable | P4-02 | expert | review |
 | P4-04 | Interactivity and visibility rules | P4-03 | review | done |
 | P4-05 | Semantic output, serialization, goldens | P4-04 | review | review |
