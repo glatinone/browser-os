@@ -39,7 +39,7 @@ assertion.**
 | Stays in `review` | Why the decision keeps it there |
 |---|---|
 | P4-02 | provenance — predates this session, no `port: allowed`, `THIRD_PARTY_NOTICES.md` reads "None yet" |
-| P4-03 | supervision `expert` **and** provenance |
+| P4-03 | supervision `expert` **and** provenance **and** unimplemented req 4 (coordinate conversion, `join.ts:87` copies `layout.bounds` verbatim) |
 | P4-05 | judgment — 12 goldens define later phases; card requires human/expert review |
 | P5-01 | AC needs Phase 7 router tests, which do not exist yet |
 | P5-02 | AC needs a manual Ollama run; not installed here |

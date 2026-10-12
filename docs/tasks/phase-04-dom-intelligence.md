@@ -96,6 +96,8 @@ Recorded all 10 non-heavy fixture pages and added selector truth maps. Browser c
 **Implementation notes**
 `joinRawCapture` now preserves element-parent relationships, inlines child iframe documents at their host position, retains text nodes separately, joins AX data by backend node identity, and identifies open shadow-root descendants by host. Tests cover determinism, iframe ordering, and shadow-root ownership. Status is `review` because this task requires expert review.
 
+**Review note (expert, 2026-10-12, Engineering 2 — STA-159): not promoted.** Requirement 4 is not implemented: `join.ts:87` copies `layout.bounds` verbatim, and no file under `packages/dom/src/` subtracts `viewport.pageX/pageY` or adds an iframe host offset (`pageX/pageY` appear only at `capture.ts:195-196`, where they fill the `viewport` object). Measured on `iframe.raw.json`: host `<iframe id=signin-frame>` is at `(8, 79.875, 364, 204)` while its child `input#frame-username` comes out at `(72.86, 16, 177, 21)` — still iframe-local, so the top-level position is off by `(8, 79.875)`. `visibility.ts:3-6` (`inViewport`) and `semantic.ts:219-220` (`rect`, `inViewport` in the Observation) consume these rects directly. All 12 fixtures record `pageX=0, pageY=0`, so the scroll half of the rule is invisible to the suite. Secondary gaps: `test/join.test.ts` loads only 3 of 12 captures, never asserts "parents precede children", and asserts the `basic` email input's `placeholder` but not its `bounds` or AX role `textbox` (both values are correct today). Requirements 1, 3, 5, 6 and the deterministic-output AC are verified.
+
 ---
 
 ## P4-04 · Interactivity and visibility rules
