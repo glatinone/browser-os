@@ -34,6 +34,11 @@ export type HumanPauseRequest = {
   reason: HumanRequest['reason'];
   message: string;
   candidates?: HumanRequest['candidates'];
+  /**
+   * Observation the candidates were rendered from (action-router §5.3.1). A `ref`
+   * answer must echo it back so a stale pick can be rejected. P7-04.
+   */
+  observationId?: string;
 };
 
 /** Pauses the run and resumes it with a human answer (or an abort). */
