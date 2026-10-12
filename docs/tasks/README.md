@@ -92,7 +92,7 @@ Phase 7 work proceeds in parallel: these five are inputs Phase 7 reads but does 
 | P4-05 | Semantic output, serialization, goldens | P4-04 | review | review |
 | P4-06 | Security challenge detection | P4-05 | cheap | done |
 | P4-07 | Lexical ranking (deterministic tier) | P4-05 | review | done |
-| P4-08 | Locator build, cssPath, matching | P4-05 | expert | review |
+| P4-08 | Locator build, cssPath, matching | P4-05 | expert | done |
 | P4-09 | Probe (cache fast path) | P4-08, P2-03 | review | done |
 | P4-10 | Playwright ariaSnapshot oracle test | P4-05 | cheap | done |
 | P4-11 | Observer (runtime) | P4-06, P4-08, P2-07 | cheap | done |
