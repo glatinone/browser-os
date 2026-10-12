@@ -36,8 +36,11 @@ export async function tryResolveLocator(
 ): Promise<Resolution | null> {
   const { driver, observer, constants, actionType, cdp, worlds, mainCdpFrameId } = input;
 
-  // Stage 1 — Probe (main frame only; §8.3)
-  if (locator.framePath.length === 0) {
+  // Stage 1 — Probe (main frame only; §8.3). Skipped when no CDP transport or
+  // helper world was handed in (P7-07 wiring absent, or a test without a live
+  // page): the probe cannot run, and burning probeTimeoutMs to reach it would
+  // only delay the full match that answers the same question.
+  if (locator.framePath.length === 0 && cdp && worlds) {
     const deadline = Date.now() + constants.probeTimeoutMs;
     while (Date.now() < deadline) {
       let candidates: ProbeCandidateLike[];
