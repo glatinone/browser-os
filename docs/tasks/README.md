@@ -33,6 +33,7 @@ assertion.**
 | P4-06 | no false positive on non-login fixtures |
 | P4-07 | ≥ 99% precision at 0.75 / 0.15 |
 | P4-09 | probe round-trip budget assertions |
+| P4-08 | round-trip passes on all 12 fixtures (expert review 2026-10-12) |
 | P5-05 | prompt carries the untrusted-data framing sentence |
 
 Promoted later, 2026-10-12, by expert review **STA-160** (Engineering 3, run `afe3b38f`): its AC is
@@ -46,11 +47,10 @@ not a test assertion but a provenance check, and it now passes — see the table
 |---|---|
 | P4-03 | supervision `expert` **and** provenance |
 | P4-05 | judgment — 12 goldens define later phases; card requires human/expert review |
-| P4-08 | supervision `expert` |
 | P5-01 | AC needs Phase 7 router tests, which do not exist yet |
 | P5-02 | AC needs a manual Ollama run; not installed here |
 
-Phase 7 work proceeds in parallel: these five are inputs Phase 7 reads but does not modify.
+Phase 7 work proceeds in parallel: these four are inputs Phase 7 reads but does not modify.
 
 ---
 
