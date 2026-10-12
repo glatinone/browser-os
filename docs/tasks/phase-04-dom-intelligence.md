@@ -104,7 +104,10 @@ live-vs-golden contract). `biome check` on the four P4-02 files: clean.
 - [x] Deterministic output (same input → deep-equal output)
 
 **Implementation notes**
-`joinRawCapture` now preserves element-parent relationships, inlines child iframe documents at their host position, retains text nodes separately, joins AX data by backend node identity, and identifies open shadow-root descendants by host. Tests cover determinism, iframe ordering, and shadow-root ownership. Status is `review` because this task requires expert review.
+`joinRawCapture` now preserves element-parent relationships, inlines child iframe documents at their host position, retains text nodes separately, joins AX data by backend node identity, and identifies open shadow-root descendants by host. **Requirement 4 (coordinate conversion) is implemented**: for each document the scroll offset (`viewport.pageX/pageY`) is subtracted from bounds, and for child documents the host iframe element's already-converted bounds are added, so nested frames stack correctly in top-level viewport coordinates. Tests cover determinism, iframe ordering, shadow-root ownership, and coordinate invariants across all 12 recorded captures (12 fixtures × full invariant suite + iframe coordinate assertion with 0.5px tolerance). Golden snapshots in `golden.test.ts` pass without regeneration (fixtures use `pageX=pageY=0`, only the iframe-host offset changes numbers).
+
+**Review verdict (2026-10-12, Engineering 3, this run): PASS → `done`.**
+Requirement 4 implemented: `join.ts` now emits bounds in top-level viewport coordinates (subtract `pageX/pageY`, add iframe host offset). Measured on `iframe.raw.json`: host iframe at `(8, 79.875, 364, 204)`, child `input#frame-username` emitted at `(80.86, 95.875, 177, 21)` — matches expected top-level coordinates (child local + host offset) within 0.5px tolerance. All 12 fixtures pass the full invariant suite (every row `backendNodeId > 0`, parents precede children, child-doc rows have `frameId ≠ main`, shadow fixture rows have `shadowHostIdx`, `basic` email input has correct bounds/role/placeholder). Downstream `visibility.ts`/`semantic.ts` golden snapshots pass unchanged (fixtures have zero scroll, only iframe-host offset affects numbers). `pnpm build`/`pnpm test`/`pnpm lint` all exit 0.
 
 ---
 

@@ -41,16 +41,16 @@ not a test assertion but a provenance check, and it now passes — see the table
 | Promoted to `done` | Why |
 |---|---|
 | P4-02 | AC "raw fixtures committed for all non-heavy fixture pages" holds (21 `*.raw.json` tracked: 12 top-level + 9 `mutations/`, only `heavy` absent as the card requires) and the provenance gate passes: the card states no `port: allowed`, the P4-02 files carry no port/adaptation markers, and `THIRD_PARTY_NOTICES.md` correctly reads "None yet". `pnpm build`, `pnpm -r typecheck`, `pnpm test` (590 passed) and `pnpm test:browser` (74 passed) all green. |
+| P4-03 | Requirement 4 (coordinate conversion) implemented in `join.ts`: subtracts `viewport.pageX/pageY` and adds iframe host offset. Measured on `iframe.raw.json`: host at `(8, 79.875, 364, 204)`, child `input#frame-username` at `(80.86, 95.875, 177, 21)` — top-level coords within 0.5px tolerance. All 12 fixtures pass full invariant suite (backendNodeId > 0, parents precede children, child-doc `frameId ≠ main`, shadow `shadowHostIdx`, `basic` email bounds/role/placeholder). Golden snapshots pass unchanged. `pnpm build`/`pnpm test`/`pnpm lint` exit 0. |
 
 | Stays in `review` | Why the decision keeps it there |
 |---|---|
-| P4-03 | supervision `expert` **and** provenance |
 | P4-05 | judgment — 12 goldens define later phases; card requires human/expert review |
 | P4-08 | supervision `expert` |
 | P5-01 | AC needs Phase 7 router tests, which do not exist yet |
 | P5-02 | AC needs a manual Ollama run; not installed here |
 
-Phase 7 work proceeds in parallel: these five are inputs Phase 7 reads but does not modify.
+Phase 7 work proceeds in parallel: these four are inputs Phase 7 reads but does not modify.
 
 ---
 
@@ -87,7 +87,7 @@ Phase 7 work proceeds in parallel: these five are inputs Phase 7 reads but does 
 | **Phase 4** | **DOM intelligence** | | | |
 | P4-01 | Text normalization utilities | P1-04 | cheap | done |
 | P4-02 | Raw capture + capture recorder script | P2-03, P3-05, P4-01 | review | done |
-| P4-03 | Join → NodeTable | P4-02 | expert | review |
+| P4-03 | Join → NodeTable | P4-02 | expert | done |
 | P4-04 | Interactivity and visibility rules | P4-03 | review | done |
 | P4-05 | Semantic output, serialization, goldens | P4-04 | review | review |
 | P4-06 | Security challenge detection | P4-05 | cheap | done |
