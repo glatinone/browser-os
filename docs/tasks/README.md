@@ -30,6 +30,7 @@ assertion.**
 | Promoted to `done` | AC is a passing test assertion |
 |---|---|
 | P4-04 | every §4/§5 bullet has a test |
+| P4-05 | expert review 12 Okt: 12 goldens deterministik (regenerasi `vitest -u` tidak mengubah satu pun SHA-256) + kedua AC kartu lulus |
 | P4-06 | no false positive on non-login fixtures |
 | P4-07 | ≥ 99% precision at 0.75 / 0.15 |
 | P4-09 | probe round-trip budget assertions |
@@ -39,12 +40,11 @@ assertion.**
 |---|---|
 | P4-02 | provenance — predates this session, no `port: allowed`, `THIRD_PARTY_NOTICES.md` reads "None yet" |
 | P4-03 | supervision `expert` **and** provenance |
-| P4-05 | judgment — 12 goldens define later phases; card requires human/expert review |
 | P4-08 | supervision `expert` |
 | P5-01 | AC needs Phase 7 router tests, which do not exist yet |
 | P5-02 | AC needs a manual Ollama run; not installed here |
 
-Phase 7 work proceeds in parallel: these six are inputs Phase 7 reads but does not modify.
+Phase 7 work proceeds in parallel: these five are inputs Phase 7 reads but does not modify.
 
 ---
 
