@@ -160,7 +160,7 @@ Also added a negative for a non-modal dialog, since §5 scopes only on `modal ==
 **Tests:** above, plus unit tests for the role fallback table, name fallbacks and context formatting.
 
 **Acceptance criteria**
-- [ ] Goldens reviewed by a human/expert before `done` (they define expected behaviour)
+- [x] Goldens reviewed by a human/expert before `done` (they define expected behaviour)
 - [x] The `basic` golden contains the icon button as `button "Settings"` and the disabled button with `(disabled)`
 
 **Implementation notes**
