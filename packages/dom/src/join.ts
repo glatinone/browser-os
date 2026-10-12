@@ -55,6 +55,8 @@ export function joinRawCapture(raw: RawCapture): NodeTable {
   const texts: TextRow[] = [];
   const localToRow = new Map<string, number>();
   const hostByDocument = new Map<number, number>();
+  const scrollX = raw.viewport?.pageX ?? 0;
+  const scrollY = raw.viewport?.pageY ?? 0;
 
   for (const docIdx of inlineDocumentOrder(raw)) {
     const doc = raw.documents[docIdx];
@@ -63,6 +65,15 @@ export function joinRawCapture(raw: RawCapture): NodeTable {
     const layoutMap = new Map(doc.layout.map((layout) => [layout.nodeIndex, layout]));
     const frameId = doc.frameId ?? raw.frames[docIdx]?.id ?? raw.frames[0]?.id ?? '';
     const documentParent = hostByDocument.get(docIdx) ?? null;
+    // §3 coordinate conversion: emit bounds in top-level viewport coordinates.
+    // Top-level document: document coords minus the scroll offset. A child
+    // document's local origin is its host <iframe>'s bounds, which were already
+    // converted when that host row was created (parent docs are joined first),
+    // so nested frames stack correctly. A child document without a laid-out
+    // host falls back to the scroll-adjusted top-level origin.
+    const hostRow = documentParent !== null ? rows[documentParent] : undefined;
+    const originX = hostRow?.bounds ? hostRow.bounds.x : -scrollX;
+    const originY = hostRow?.bounds ? hostRow.bounds.y : -scrollY;
 
     for (let nodeIdx = 0; nodeIdx < nodes.length; nodeIdx++) {
       const node = nodes[nodeIdx];
@@ -84,7 +95,14 @@ export function joinRawCapture(raw: RawCapture): NodeTable {
         tag: node.nodeName?.toLowerCase() ?? '',
         attrs: parseAttributes(node.attributes ?? []),
         shadowHostIdx: findShadowHost(nodes, localParent, localToRow, docIdx, documentParent),
-        bounds: layout ? { x: layout.bounds[0], y: layout.bounds[1], w: layout.bounds[2], h: layout.bounds[3] } : null,
+        bounds: layout
+          ? {
+              x: layout.bounds[0] + originX,
+              y: layout.bounds[1] + originY,
+              w: layout.bounds[2],
+              h: layout.bounds[3],
+            }
+          : null,
         styles: layout?.styles ?? {},
         paintOrder: layout?.paintOrder ?? null,
         isClickable: node.isClickable ?? false,
