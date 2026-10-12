@@ -35,11 +35,11 @@ assertion.**
 | P4-09 | probe round-trip budget assertions |
 | P4-08 | round-trip passes on all 12 fixtures (expert review 2026-10-12) |
 | P5-05 | prompt carries the untrusted-data framing sentence |
+| P4-03 | req 4 coordinate conversion plus the 12-fixture invariant suite (expert review 2026-10-12, fix `277de5a` verified at `d64e835`) |
 
 | Stays in `review` | Why the decision keeps it there |
 |---|---|
 | P4-02 | provenance — predates this session, no `port: allowed`, `THIRD_PARTY_NOTICES.md` reads "None yet" |
-| P4-03 | supervision `expert` **and** provenance **and** unimplemented req 4 (coordinate conversion, `join.ts:87` copies `layout.bounds` verbatim) |
 | P4-05 | judgment — 12 goldens define later phases; card requires human/expert review |
 | P5-01 | AC needs Phase 7 router tests, which do not exist yet |
 | P5-02 | AC needs a manual Ollama run; not installed here |
@@ -81,7 +81,7 @@ Phase 7 work proceeds in parallel: these five are inputs Phase 7 reads but does 
 | **Phase 4** | **DOM intelligence** | | | |
 | P4-01 | Text normalization utilities | P1-04 | cheap | done |
 | P4-02 | Raw capture + capture recorder script | P2-03, P3-05, P4-01 | review | review |
-| P4-03 | Join → NodeTable | P4-02 | expert | review |
+| P4-03 | Join → NodeTable | P4-02 | expert | done |
 | P4-04 | Interactivity and visibility rules | P4-03 | review | done |
 | P4-05 | Semantic output, serialization, goldens | P4-04 | review | review |
 | P4-06 | Security challenge detection | P4-05 | cheap | done |
