@@ -1,10 +1,12 @@
 import type { PageDriver, ResolvedTarget } from '@browser-os/browser';
 import type {
   ActionResult,
+  ActionType,
   BrowserAction,
   EventBus,
   ExecutionContext,
   Target,
+  Tier,
   TierAttempt,
   ValueSource,
 } from '@browser-os/protocol';
@@ -21,6 +23,8 @@ import {
   settleAfterNavigate,
   verifyAndSettle,
 } from './execute.js';
+import { learnFromResolution, resolveIntentTarget } from './resolve-intent.js';
+import { applyLearning, tryResolveLocator } from './resolve-locator.js';
 import { resolveQuery } from './resolve-query.js';
 import { resolveRef } from './resolve-ref.js';
 import type {
@@ -28,6 +32,8 @@ import type {
   DisabledTier,
   ExecuteOptions,
   ObserverPort,
+  PageContext,
+  PagesPort,
   Resolution,
   RouterCoreDeps,
   RunPort,
@@ -39,6 +45,9 @@ import { toResolvedTarget } from './verify.js';
 function newActionId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
+
+/** §4-H tiers whose resolution is worth learning into the action cache. */
+const LEARNABLE_TIERS = new Set<Tier>(['deterministic', 'llm', 'vision', 'human']);
 
 /**
  * The copy of the action that goes on the wire (`action.started`). A `secret` value
@@ -57,6 +66,7 @@ export class ActionRouter {
   private readonly observer: ObserverPort;
   private readonly runs: RunPort;
   private readonly cache: ActionCachePort;
+  private readonly pages: PagesPort;
   private readonly risk: RiskClassifier;
   private readonly permissions: PermissionGate;
   private readonly human: HumanGate | null;
@@ -71,6 +81,7 @@ export class ActionRouter {
     this.observer = deps.observer;
     this.runs = deps.runs;
     this.cache = deps.cache;
+    this.pages = deps.pages;
     this.risk = deps.risk;
     this.permissions = deps.permissions;
     this.human = deps.human;
@@ -131,7 +142,7 @@ export class ActionRouter {
     let resolved: Resolution;
     const attempts: TierAttempt[] = [];
     try {
-      resolved = await this.resolveTarget(target, ctx, attempts, opts.healIntent ?? null);
+      resolved = await this.resolveTarget(action, target, ctx, attempts, opts.healIntent ?? null);
     } catch (error) {
       if (isBosError(error) && error.code === 'CANCELLED') throw error;
       return this.finish(actionId, startedAt, ctx, action, { ok: false, error: this.toResultError(error) });
@@ -186,6 +197,7 @@ export class ActionRouter {
       // The driver ran (or tried to), so the cached observation for this page is stale.
       this.observer.invalidate(ctx.pageId);
       if (isBosError(error) && error.code === 'CANCELLED') throw error;
+      this.invalidateFalseHit(resolved, error);
       return this.finish(actionId, startedAt, ctx, action, {
         ok: false,
         error: this.toResultError(error),
@@ -212,6 +224,7 @@ export class ActionRouter {
       });
     } catch (error) {
       if (isBosError(error) && error.code === 'CANCELLED') throw error;
+      this.invalidateFalseHit(resolved, error);
       if (changed) this.markActivePage(ctx, dispatched.result.newPageId ?? ctx.pageId);
       return this.finish(actionId, startedAt, ctx, action, {
         ok: false,
@@ -222,13 +235,10 @@ export class ActionRouter {
     }
     if (changed) this.markActivePage(ctx, aftermath.newPageId ?? ctx.pageId);
 
-    // H. Learn / cache
-    if (target.kind === 'intent' && ['deterministic', 'llm', 'vision', 'human'].includes(resolved.tier)) {
-      // Cache learning would go here (P7-03).
-    }
-    if (resolved.tier === 'cache') {
-      // Record cache hit (P7-03).
-    }
+    // H. Learn (action-router §4 step H; memory §4.2/§5). Both writes happen
+    // only after G verified the action, so a cache tier that resolved but did
+    // not verify never counts as a hit.
+    this.learn(resolved, target.kind === 'intent', ctx.params);
 
     return this.finish(actionId, startedAt, ctx, action, {
       ok: true,
@@ -305,7 +315,43 @@ export class ActionRouter {
     });
   }
 
+  /**
+   * Action-router §4 step H, run only after step G verified the action.
+   *
+   * - cache tier + verified → `recordHit` on the key the tier consulted;
+   * - deterministic/llm/vision/human on an intent target → learn the locator
+   *   (param-substituted) into the action cache, both cache slots;
+   * - ref/locator/query targets carry no learning data and never write.
+   */
+  private learn(resolved: Resolution, isIntentTarget: boolean, params: Record<string, string>): void {
+    const learning = resolved.intentLearning;
+    if (!learning) return;
+
+    if (resolved.tier === 'cache') {
+      if (learning.key !== null) this.cache.recordHit(learning.key);
+      return;
+    }
+
+    if (isIntentTarget && LEARNABLE_TIERS.has(resolved.tier)) {
+      learnFromResolution(resolved.entry.locator, learning.query, params, this.cache);
+    }
+  }
+
+  /**
+   * §5 false hit: the action cache resolved a locator that the action did not
+   * verify against. Retiring the entry here keeps the entry from being served
+   * again while the ladder relearns on the next call (memory §5).
+   */
+  private invalidateFalseHit(resolved: Resolution, error: unknown): void {
+    const learning = resolved.intentLearning;
+    if (!learning || learning.key === null || resolved.tier !== 'cache') return;
+    if (isBosError(error) && error.code === 'VERIFICATION_FAILED') {
+      this.cache.invalidate(learning.key, 'verification_failed');
+    }
+  }
+
   private async resolveTarget(
+    action: BrowserAction,
     target: Target,
     ctx: ExecutionContext,
     attempts: TierAttempt[],
@@ -315,11 +361,11 @@ export class ActionRouter {
       case 'ref':
         return this.resolveRefTarget(target, ctx, attempts);
       case 'locator':
-        return this.resolveLocatorTarget(target, ctx, attempts);
+        return this.resolveLocatorTarget(target, ctx, attempts, healIntent, action.type);
       case 'query':
         return this.resolveQueryTarget(target, ctx, attempts);
       case 'intent':
-        return this.resolveIntentTarget(target, ctx, attempts, healIntent);
+        return this.resolveIntentTarget(action.type, target, ctx, attempts, healIntent);
       default:
         throw new BosError('INVALID_REQUEST', `Unknown target kind: ${String((target as Target).kind)}`);
     }
@@ -345,12 +391,34 @@ export class ActionRouter {
   }
 
   private async resolveLocatorTarget(
-    _target: Extract<Target, { kind: 'locator' }>,
-    _ctx: ExecutionContext,
-    _attempts: TierAttempt[],
+    target: Extract<Target, { kind: 'locator' }>,
+    ctx: ExecutionContext,
+    attempts: TierAttempt[],
+    healIntent: string | null,
+    actionType: ActionType,
   ): Promise<Resolution> {
-    // Locator tier arrives with P7-03 (intent/locator tiers are out of P7-02 scope).
-    throw new BosError('TARGET_NOT_FOUND', 'Locator resolution not implemented');
+    // Trajectory replay target — action-router §5 case 'locator', tier 1.
+    // The locator is trusted, so it goes straight through tryResolveLocator
+    // (probe → fingerprint match). No cache read/write: a locator target is
+    // itself the cache entry.
+    const resolved = await tryResolveLocator(target.locator, 'cache', attempts, {
+      driver: this.driver,
+      observer: this.observer,
+      cache: this.cache,
+      constants: this.constants,
+      actionType,
+      sessionId: ctx.sessionId,
+      pageId: ctx.pageId,
+      cdp: null,
+      worlds: null,
+      mainCdpFrameId: '',
+    });
+    if (resolved) return resolved;
+    if (!healIntent) throw new BosError('TARGET_NOT_FOUND', 'The locator no longer matches the page');
+    // §5.4: the locator failed, so resolution continues as the healed intent
+    // from tier 2 onward. The action cache is not consulted again, which the
+    // ladder expresses as an intent that skips tier 1 entirely.
+    return this.resolveIntentTarget(actionType, { kind: 'intent', text: healIntent }, ctx, attempts, null, true);
   }
 
   private async resolveQueryTarget(
@@ -365,12 +433,37 @@ export class ActionRouter {
   }
 
   private async resolveIntentTarget(
-    _target: Extract<Target, { kind: 'intent' }>,
-    _ctx: ExecutionContext,
-    _attempts: TierAttempt[],
-    _healIntent: string | null,
+    actionType: ActionType,
+    target: Extract<Target, { kind: 'intent' }>,
+    ctx: ExecutionContext,
+    attempts: TierAttempt[],
+    healIntent: string | null,
+    skipCache = false,
   ): Promise<Resolution> {
-    throw new BosError('TARGET_NOT_FOUND', 'Intent resolution not implemented');
+    const pageContext = await this.pages.context(ctx.sessionId, ctx.pageId);
+
+    return resolveIntentTarget(
+      {
+        intent: target.text,
+        actionType,
+        url: pageContext.url ?? undefined,
+        sessionId: ctx.sessionId,
+        pageId: ctx.pageId,
+        params: ctx.params,
+        healIntent,
+        skipCache,
+      },
+      attempts,
+      {
+        driver: this.driver,
+        observer: this.observer,
+        cache: this.cache,
+        constants: this.constants,
+        cdp: pageContext.cdp,
+        worlds: pageContext.worlds,
+        mainCdpFrameId: pageContext.mainCdpFrameId,
+      },
+    );
   }
 
   private async resolveValue(value: ValueSource | undefined, ctx: ExecutionContext): Promise<string | undefined> {
