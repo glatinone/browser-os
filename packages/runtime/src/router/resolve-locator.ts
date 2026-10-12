@@ -9,10 +9,10 @@ import type {
   SemanticElement,
   Tier,
 } from '@browser-os/protocol';
-import { DEFAULT_ROUTER_CONSTANTS } from './constants.js';
+import { BosError } from '../errors.js';
+import type { DEFAULT_ROUTER_CONSTANTS } from './constants.js';
 import type { ActionCachePort, ActionCacheQuery, Resolution } from './types.js';
 import { buildResolution } from './types.js';
-import { BosError } from '../errors.js';
 
 /** Output of a tier resolution: the `Resolution` plus the entry it came from. */
 export interface LocatorResult {
@@ -72,8 +72,7 @@ export async function tryResolveLocator(
   if (best) {
     const runnerUp = scored[1];
     const ok =
-      best.score >= constants.matchAccept &&
-      (!runnerUp || best.score - runnerUp.score >= constants.matchMargin);
+      best.score >= constants.matchAccept && (!runnerUp || best.score - runnerUp.score >= constants.matchMargin);
     if (ok) {
       return buildResolution(tierLabel, observation, best.ref, best.entry);
     }
@@ -179,12 +178,12 @@ async function runProbe(
   // probe() lives in @browser-os/dom; it takes (cdp, worlds, mainCdpFrameId, locator).
   // The runtime already has cdp/worlds/mainCdpFrameId from PageContext (P7-07 wiring).
   const { probe } = await import('@browser-os/dom');
-  return (probe as (
-    c: unknown,
-    w: unknown,
-    f: string,
-    l: ElementLocator,
-  ) => Promise<ProbeCandidateLike[]>)(cdp, worlds, mainCdpFrameId, locator);
+  return (probe as (c: unknown, w: unknown, f: string, l: ElementLocator) => Promise<ProbeCandidateLike[]>)(
+    cdp,
+    worlds,
+    mainCdpFrameId,
+    locator,
+  );
 }
 
 function buildResolutionFromProbe(
@@ -212,5 +211,5 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export { applyParamsToLocator, BosError };
 export type { SemanticElement };
+export { applyParamsToLocator, BosError };
