@@ -141,6 +141,32 @@ export interface Resolution {
   intentLearning?: { query: ActionCacheQuery; key: string | null };
 }
 
+/**
+ * A tier-attempt record as the intent ladder collects it: protocol
+ * `TierAttempt` widened so the ladder's diagnostic reasons
+ * ('locator_not_found', 'challenge', …), which are not `ErrorCode`s, are
+ * still recorded. The router keeps its own array typed as `TierAttempt`,
+ * which stays assignable to this.
+ */
+export interface LadderAttempt {
+  tier: Tier;
+  ok: boolean;
+  ms: number;
+  reason?: string;
+  candidates?: number;
+  score?: number;
+}
+
+/**
+ * §5.3.2 / P7-04: the human performed the step by hand. The router reports
+ * `ok: true, tier: 'human'` without dispatching anything, and the cache is
+ * NOT written — there was no resolution to learn.
+ */
+export interface HumanDone {
+  tier: 'human';
+  done: true;
+}
+
 /** A resolution plus the observation it was derived from (needed for verify and settle). */
 export interface ResolutionOutcome {
   resolution: Resolution;
@@ -241,6 +267,14 @@ export interface RouterCoreDeps {
   risk: RiskClassifier;
   permissions: PermissionGate;
   human: HumanGate | null;
+  /**
+   * P7-04: the model registry the LLM tier reads `fast` from, and the vision
+   * tier hook (MVP ships `NullVisionResolver`). Optional exactly like `human`
+   * so a P7-02-era constructor keeps compiling; when absent the ladder records
+   * `LLM_DISABLED` and falls through, and vision never claims a target.
+   */
+  models?: ModelsPort | null;
+  vision?: VisionResolver | null;
   runs: RunPort;
   cache: ActionCachePort;
   /** The router only emits; a full `EventBus` satisfies it. */

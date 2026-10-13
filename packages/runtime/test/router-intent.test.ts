@@ -380,7 +380,10 @@ const EMAIL_FIELD = 'fill the email box'; // ranks 0.80 against a lone 'Email' t
 function makeHarness(elements: SemanticElement[], url = 'https://example.test/checkout') {
   const store = openStore(':memory:');
   const cache = new ActionCacheStore(store.db);
-  const models = new FakeModelProvider({ responder: {} });
+  // P7-04: tier 3 consults this model when the ladder falls that far, so the
+  // fake declines every prompt (`ref: null`) — the ladder falls through to the
+  // next tier, exactly as a `fast` model would when nothing matches the page.
+  const models = new FakeModelProvider({ responder: () => ({ ref: null, confidence: 0 }) });
   const events: Array<{ type: string; data: any }> = [];
   const driverResult = () => ({
     ok: true,
@@ -451,7 +454,7 @@ function makeHarness(elements: SemanticElement[], url = 'https://example.test/ch
       requestConfirmation: vi.fn(async (): Promise<'approve'> => 'approve'),
     },
     human: null,
-    models,
+    models: { get: () => models },
     vision: null,
     events: { emit: (e: any) => events.push({ type: e.type, data: e.data }) },
     recorder: null,
@@ -466,7 +469,13 @@ function makeHarness(elements: SemanticElement[], url = 'https://example.test/ch
     policy: { budgets: { actionTimeoutMs: 2000, maxLlmCallsPerAction: 3, maxLlmCallsPerTask: 10 } },
     params: {},
     secrets: { resolve: async () => 'sekret' },
-    budget: {},
+    budget: {
+      llmCallsAction: 0,
+      llmCallsActionMax: 3,
+      llmCallsTask: 0,
+      llmCallsTaskMax: 10,
+      deadline: Number.POSITIVE_INFINITY,
+    },
     signal: new AbortController().signal,
     clock: { now: () => Date.now() },
   });
@@ -525,8 +534,9 @@ describe('ActionRouter intent ladder over a real ActionCacheStore (P7-03)', () =
     expect(second.ok).toBe(true);
     expect(second.tier).toBe('cache');
     expect(second.attempts).toContainEqual(expect.objectContaining({ tier: 'cache', ok: true }));
-    // Structural, not merely asserted: the P7-03 ladder holds no ModelsPort,
-    // so tier 1 + tier 2 cannot reach a model. The fake counts prove it.
+    // Structural, not merely asserted: the ladder short-circuits at tier 1, so
+    // tiers 2–5 — the model included — are never consulted on this hit. The
+    // fake counts prove it (P7-04 wired tier 3; it still cannot be reached).
     expect(h.models.calls).toBe(0);
     expect(second.llm).toEqual({ calls: 0, inputTokens: 0, outputTokens: 0 });
     // Step H recorded the verified cache-tier resolution as a hit on the row
@@ -564,7 +574,10 @@ describe('ActionRouter intent ladder over a real ActionCacheStore (P7-03)', () =
     }
     const pageRow = h.cache.list().find((r) => r.path_template === '/checkout');
     expect(pageRow?.status).toBe('invalid');
-    expect(h.models.calls).toBe(0);
+    // P7-04: each miss legitimately consults the model once — tier 3 runs,
+    // the fake declines (`ref: null`), and the ladder still ends at
+    // TARGET_NOT_FOUND. Three misses, three model calls.
+    expect(h.models.calls).toBe(3);
   });
 
   it('false hit: a cache-tier resolution that fails verification invalidates the row', async () => {

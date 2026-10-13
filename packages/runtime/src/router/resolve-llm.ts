@@ -1,7 +1,7 @@
 import { type ResolvePromptInput, resolveWithModel } from '@browser-os/ai';
 import { lexicalRank } from '@browser-os/dom';
-import type { ModelProvider, Observation, ObservationIndex, SemanticElement, TierAttempt } from '@browser-os/protocol';
-import { buildResolution, type Resolution } from './types.js';
+import type { ModelProvider, Observation, ObservationIndex, SemanticElement } from '@browser-os/protocol';
+import { buildResolution, type LadderAttempt, type Resolution } from './types.js';
 
 export interface ResolveLlmInput {
   actionType: string;
@@ -46,7 +46,7 @@ export type LlmTierOutcome =
  * Model output never becomes a selector: `resolveWithModel` already rejects any `ref` that
  * was not in the candidate list (SECURITY.md §9 "Output contract").
  */
-export async function resolveLlmTier(input: ResolveLlmInput, attempts: TierAttempt[]): Promise<LlmTierOutcome> {
+export async function resolveLlmTier(input: ResolveLlmInput, attempts: LadderAttempt[]): Promise<LlmTierOutcome> {
   const { actionType, intent, observation, index, model, enabled, budget, constants } = input;
 
   if (!enabled || !model) {

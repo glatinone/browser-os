@@ -6,11 +6,17 @@ import type {
   HumanRequest,
   Observation,
   ObservationIndex,
-  TierAttempt,
 } from '@browser-os/protocol';
 import { BosError } from '../errors.js';
 import type { HumanGate } from '../security/interfaces.js';
-import { type ActionCachePort, type ActionCacheQuery, buildResolution, type Resolution } from './types.js';
+import {
+  type ActionCachePort,
+  type ActionCacheQuery,
+  buildResolution,
+  type HumanDone,
+  type LadderAttempt,
+  type Resolution,
+} from './types.js';
 
 export interface ResolveHumanInput {
   action: BrowserAction;
@@ -47,8 +53,8 @@ export interface ResolveHumanInput {
  */
 export async function resolveHumanTier(
   input: ResolveHumanInput,
-  attempts: TierAttempt[],
-): Promise<Resolution | { tier: 'human'; done: true }> {
+  attempts: LadderAttempt[],
+): Promise<Resolution | HumanDone> {
   const { action, intent, observation, index, ctx, humanGate, reason } = input;
 
   const candidates = topCandidates(input).map((element) => ({

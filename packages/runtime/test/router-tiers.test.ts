@@ -18,8 +18,9 @@ import type {
 import { MASKED_VALUE } from '@browser-os/protocol';
 import { describe, expect, it } from 'vitest';
 import { pauseForChallenge, resolveHumanTier } from '../src/router/resolve-human.js';
+import { resolveIntentTarget } from '../src/router/resolve-intent.js';
 import { resolveLlmTier, selectCandidates } from '../src/router/resolve-llm.js';
-import type { ActionCachePort, ActionCacheQuery } from '../src/router/types.js';
+import type { ActionCachePort, ActionCacheQuery, VisionResolver } from '../src/router/types.js';
 import { NullVisionResolver } from '../src/router/vision.js';
 import type { HumanGate } from '../src/security/interfaces.js';
 import { RejectingHumanGate } from '../src/security/stubs.js';
@@ -29,10 +30,9 @@ import { RejectingHumanGate } from '../src/security/stubs.js';
  * challenge gate. Everything runs against fakes: no page, no CDP, no network, and the
  * only "model" is `FakeModelProvider`.
  *
- * These tests call the tier functions directly rather than through
- * `ActionRouter.execute`, because the intent ladder that sequences tiers 1→5 is still
- * un-wired (`router.ts:367` throws `TARGET_NOT_FOUND`; it belongs to P7-03). See the
- * OPEN entry in docs/tasks/CONFLICTS.md.
+ * The tier functions are covered here at module level, and the wired ladder
+ * (`resolveIntentTarget`, tiers 2→5 in order) at the bottom of this file — P7-04
+ * wired tiers 3–5 and the challenge gate into the ladder that P7-03 sequenced.
  */
 
 const RAW_SECRET = 'hunter2-CANARY-e3f1';
@@ -696,5 +696,304 @@ describe('NullVisionResolver (P7-04 requirement 3)', () => {
       ctx: ctx(),
     });
     expect(result).toBeNull();
+  });
+});
+
+// ── the wired ladder: tiers 2 → 5 in order ──────────────────────────────────
+
+describe('resolveIntentTarget wiring (P7-04)', () => {
+  const intent = 'the export button'; // nothing on the page matches: tier 2 scores < accept (0.75) and declines,
+  // so the ladder falls to tiers 3–5 (the same fixture the §5.2 module tests assume).
+  const elements = [
+    element('e3', 'link', 'Cancel'),
+    element('e7', 'button', 'Save'),
+    element('e12', 'button', 'Save draft'),
+    element('e20', 'paragraph', 'Changes are saved automatically.'),
+  ];
+
+  /** Captures in order, so a test can hand the ladder a challenged page first. */
+  function captureDeps(pages: Array<{ observation: Observation; index: ObservationIndex }>) {
+    let i = 0;
+    return {
+      capture: async () => pages[Math.min(i++, pages.length - 1)],
+      index: () => pages[0]!.index,
+      invalidate: () => {},
+    };
+  }
+
+  function ladderInput(obs: Observation, c: ExecutionContext): Parameters<typeof resolveIntentTarget>[0] {
+    return {
+      intent,
+      actionType: 'click',
+      url: obs.url,
+      sessionId: 's1',
+      pageId: 'p1',
+      skipCache: true,
+      action: clickAction(),
+      ctx: c,
+    };
+  }
+
+  function ladderDeps(
+    pages: Array<{ observation: Observation; index: ObservationIndex }>,
+    extra: Record<string, unknown> = {},
+  ): Parameters<typeof resolveIntentTarget>[2] {
+    return {
+      driver: {} as never,
+      observer: captureDeps(pages),
+      cache: fakeCache().port,
+      ...extra,
+    } as Parameters<typeof resolveIntentTarget>[2];
+  }
+
+  function policyCtx(
+    tiers: Partial<{ llm: boolean; vision: boolean; human: boolean }>,
+    budgetOverrides: Partial<{ llmCallsAction: number }> = {},
+  ): ExecutionContext {
+    const c = ctx();
+    (c.policy as unknown as { tiers: { llm: boolean; vision: boolean; human: boolean } }).tiers = {
+      llm: tiers.llm ?? true,
+      vision: tiers.vision ?? false,
+      human: tiers.human ?? true,
+    };
+    Object.assign(c.budget, budgetOverrides);
+    return c;
+  }
+
+  /** Model that always declines — nothing on the page matches (§5.2 `return null`). */
+  function decliningModel(): FakeModelProvider {
+    return new FakeModelProvider({ responder: () => ({ ref: null, confidence: 0 }) });
+  }
+
+  /** Model that picks `ref` for the exact prompt the ladder sends (truthResponder keys on prompt text). */
+  function pickingModel(obs: Observation, ref: string): FakeModelProvider {
+    const key = promptText(
+      buildResolvePrompt({
+        actionType: 'click',
+        intent,
+        url: obs.url,
+        title: obs.title,
+        dialogs: obs.dialogs,
+        candidates: selectCandidates(obs, intent, 'click', 5),
+      }),
+    );
+    return new FakeModelProvider({ responder: confident(truthResponder({ [key]: ref })) });
+  }
+
+  it('tier 3: the ladder falls through to the model, consumes the budget, and resolves at tier llm', async () => {
+    const { observation: obs, index } = observation(elements);
+    const model = pickingModel(obs, 'e12');
+    const c = policyCtx({});
+    const attempts: TierAttempt[] = [];
+
+    const result = await resolveIntentTarget(
+      ladderInput(obs, c),
+      attempts,
+      ladderDeps([{ observation: obs, index }], { models: { get: () => model } }),
+    );
+
+    expect(result).toMatchObject({ tier: 'llm', entry: { backendNodeId: 12 } });
+    expect(result).toHaveProperty('intentLearning');
+    expect(model.calls).toBe(1);
+    expect(c.budget.llmCallsAction).toBe(1); // §5.2: spent by the call itself
+    expect(attempts).toEqual([
+      expect.objectContaining({ tier: 'deterministic', ok: false }),
+      expect.objectContaining({ tier: 'llm', ok: true, candidates: 4 }), // 4 click-compatible elements in the fixture
+    ]);
+  });
+
+  it('tier 3 skipped when policy.tiers.llm is false — LLM_DISABLED recorded, model untouched', async () => {
+    const { observation: obs, index } = observation(elements);
+    const model = decliningModel();
+    const c = policyCtx({ llm: false });
+    const attempts: TierAttempt[] = [];
+
+    await expect(
+      resolveIntentTarget(
+        ladderInput(obs, c),
+        attempts,
+        ladderDeps([{ observation: obs, index }], { models: { get: () => model } }),
+      ),
+    ).rejects.toMatchObject({ code: 'TARGET_NOT_FOUND' });
+
+    expect(model.calls).toBe(0);
+    expect(attempts).toContainEqual(expect.objectContaining({ tier: 'llm', ok: false, reason: 'LLM_DISABLED' }));
+  });
+
+  it('tier 3 skipped when the action budget is spent — BUDGET_EXCEEDED recorded, model untouched', async () => {
+    const { observation: obs, index } = observation(elements);
+    const model = decliningModel();
+    const c = policyCtx({}, { llmCallsAction: 2 }); // llmCallsActionMax is 2
+    const attempts: TierAttempt[] = [];
+
+    await expect(
+      resolveIntentTarget(
+        ladderInput(obs, c),
+        attempts,
+        ladderDeps([{ observation: obs, index }], { models: { get: () => model } }),
+      ),
+    ).rejects.toMatchObject({ code: 'TARGET_NOT_FOUND' });
+
+    expect(model.calls).toBe(0);
+    expect(attempts).toContainEqual(expect.objectContaining({ tier: 'llm', ok: false, reason: 'BUDGET_EXCEEDED' }));
+  });
+
+  it('tier 5: every automatic tier declined, the human points at a ref and it is learned', async () => {
+    const { observation: obs, index } = observation(elements);
+    const cache = fakeCache();
+    const { gate: humanGate, requests } = gate({ choice: 'ref', ref: 'e7', observationId: obs.id });
+    const attempts: TierAttempt[] = [];
+
+    const result = await resolveIntentTarget(
+      ladderInput(obs, policyCtx({})),
+      attempts,
+      ladderDeps([{ observation: obs, index }], {
+        models: { get: () => decliningModel() },
+        humanGate,
+        cache: cache.port,
+      }),
+    );
+
+    expect(result).toMatchObject({ tier: 'human', entry: { backendNodeId: 7 } });
+    expect(requests[0]).toMatchObject({ reason: 'ambiguous' });
+    expect(requests[0]?.candidates?.length).toBeGreaterThan(0);
+    expect(cache.puts).toHaveLength(1); // §5.3.2: the human taught us — learned immediately
+    expect(attempts).toEqual([
+      expect.objectContaining({ tier: 'deterministic', ok: false }),
+      expect.objectContaining({ tier: 'llm', ok: false }),
+      expect.objectContaining({ tier: 'human', ok: true }),
+    ]);
+  });
+
+  it('tier 5 done: HumanDone reaches the caller verbatim and nothing is cached', async () => {
+    const { observation: obs, index } = observation(elements);
+    const cache = fakeCache();
+    const { gate: humanGate } = gate({ choice: 'done' });
+    const attempts: TierAttempt[] = [];
+
+    const result = await resolveIntentTarget(
+      ladderInput(obs, policyCtx({})),
+      attempts,
+      ladderDeps([{ observation: obs, index }], { humanGate, cache: cache.port }),
+    );
+
+    expect(result).toEqual({ tier: 'human', done: true });
+    expect(cache.puts).toHaveLength(0); // no resolution — nothing to learn
+    expect(attempts.at(-1)).toMatchObject({ tier: 'human', ok: true });
+  });
+
+  it('tier 5 abort: HUMAN_REQUIRED with the attempt recorded', async () => {
+    const { observation: obs, index } = observation(elements);
+    const { gate: humanGate } = gate({ choice: 'abort' });
+    const attempts: TierAttempt[] = [];
+
+    await expect(
+      resolveIntentTarget(
+        ladderInput(obs, policyCtx({})),
+        attempts,
+        ladderDeps([{ observation: obs, index }], { humanGate }),
+      ),
+    ).rejects.toMatchObject({ code: 'HUMAN_REQUIRED' });
+
+    expect(attempts.at(-1)).toMatchObject({ tier: 'human', ok: false, reason: 'HUMAN_REQUIRED' });
+  });
+
+  it('tier 4: the vision resolver may claim the target when policy.tiers.vision is on', async () => {
+    const { observation: obs, index } = observation(elements);
+    const vision: VisionResolver = { resolve: async () => index.entries.get('e12') ?? null };
+    const attempts: TierAttempt[] = [];
+
+    const result = await resolveIntentTarget(
+      ladderInput(obs, policyCtx({ vision: true })),
+      attempts,
+      ladderDeps([{ observation: obs, index }], { vision }),
+    );
+
+    expect(result).toMatchObject({ tier: 'vision', entry: { backendNodeId: 12 } });
+    expect(result).toHaveProperty('intentLearning');
+  });
+
+  it('tier 4: NullVisionResolver falls through silently — no vision attempt', async () => {
+    const { observation: obs, index } = observation(elements);
+    const attempts: TierAttempt[] = [];
+
+    await expect(
+      resolveIntentTarget(
+        ladderInput(obs, policyCtx({ vision: true })),
+        attempts,
+        ladderDeps([{ observation: obs, index }], { vision: new NullVisionResolver() }),
+      ),
+    ).rejects.toMatchObject({ code: 'TARGET_NOT_FOUND' });
+
+    expect(attempts.map((a) => a.tier)).toEqual(['deterministic']);
+  });
+
+  it('§4 step D: a challenge pauses the human gate before resolution continues', async () => {
+    const { observation: challenged, index } = observation(elements, { challenge: 'login' });
+    const { gate: humanGate, requests } = gate({ choice: 'abort' });
+    const attempts: TierAttempt[] = [];
+
+    await expect(
+      resolveIntentTarget(
+        ladderInput(challenged, ctx()),
+        attempts,
+        ladderDeps([{ observation: challenged, index }], { humanGate }),
+      ),
+    ).rejects.toMatchObject({ code: 'SECURITY_CHALLENGE' });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ reason: 'login' });
+    expect(attempts).toContainEqual(expect.objectContaining({ tier: 'deterministic', ok: false, reason: 'challenge' }));
+  });
+
+  it('§4 step D: with no gate wired a challenge is still SECURITY_CHALLENGE, never a defeat attempt', async () => {
+    const { observation: challenged, index } = observation(elements, { challenge: 'captcha' });
+
+    await expect(
+      resolveIntentTarget(ladderInput(challenged, ctx()), [], ladderDeps([{ observation: challenged, index }])),
+    ).rejects.toMatchObject({ code: 'SECURITY_CHALLENGE' });
+  });
+
+  it('§4 step D: a human who cleared the wall lets resolution restart once and it resolves', async () => {
+    const { observation: challenged, index } = observation(elements, { challenge: 'login' });
+    const { observation: cleared } = observation(elements); // same page, wall gone
+    const model = pickingModel(cleared, 'e12');
+    const { gate: humanGate, requests } = gate({ choice: 'done' });
+    const attempts: TierAttempt[] = [];
+
+    const result = await resolveIntentTarget(
+      ladderInput(challenged, policyCtx({})),
+      attempts,
+      ladderDeps(
+        [
+          { observation: challenged, index },
+          { observation: cleared, index },
+        ],
+        {
+          models: { get: () => model },
+          humanGate,
+        },
+      ),
+    );
+
+    expect(requests).toHaveLength(1); // exactly one pause
+    expect(result).toMatchObject({ tier: 'llm', entry: { backendNodeId: 12 } });
+    expect(attempts).toContainEqual(expect.objectContaining({ reason: 'challenge', ok: false }));
+  });
+
+  it('§4 step D: a wall that survives the resume fails SECURITY_CHALLENGE — never a loop', async () => {
+    const { observation: challenged, index } = observation(elements, { challenge: 'mfa' });
+    const { gate: humanGate, requests } = gate({ choice: 'done' }); // "resume"
+    const attempts: TierAttempt[] = [];
+
+    await expect(
+      resolveIntentTarget(
+        ladderInput(challenged, ctx()),
+        attempts,
+        ladderDeps([{ observation: challenged, index }], { humanGate }),
+      ),
+    ).rejects.toMatchObject({ code: 'SECURITY_CHALLENGE' });
+
+    expect(requests).toHaveLength(1);
   });
 });
