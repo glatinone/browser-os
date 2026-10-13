@@ -625,4 +625,29 @@ describe('ActionRouter intent ladder over a real ActionCacheStore (P7-03)', () =
     expect(get).not.toHaveBeenCalled();
     expect(h.models.calls).toBe(0);
   });
+
+  it('L12 informational: cache-tier action overhead stays inside the 50 ms budget', async () => {
+    // PERFORMANCE.md L12 = cache-tier action, Browser-OS overhead (lookup +
+    // probe + verifyIdentity + permission + CDP dispatch + verify). Here the
+    // driver/observer are fakes, so this measures the router-side ladder only;
+    // the printed p50 is informational for the benchmarks work in phase 10.
+    const h = makeHarness([makeElement('e1', 'button', 'Save')]);
+    const warm = await h.router.execute(clickSave, h.ctx());
+    expect(warm.ok).toBe(true);
+
+    const samples: number[] = [];
+    for (let i = 0; i < 40; i++) {
+      const started = performance.now();
+      const result = await h.router.execute(clickSave, h.ctx());
+      samples.push(performance.now() - started);
+      expect(result.ok).toBe(true);
+      expect(result.tier).toBe('cache');
+    }
+
+    samples.sort((a, b) => a - b);
+    const p50 = samples[Math.floor(samples.length / 2)] ?? 0;
+    console.log(`L12 cache-tier action overhead: p50=${p50.toFixed(3)}ms (budget <= 50ms, informational)`);
+    expect(h.models.calls).toBe(0);
+    expect(p50).toBeLessThanOrEqual(50);
+  });
 });
