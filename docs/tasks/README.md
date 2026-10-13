@@ -108,7 +108,7 @@ Phase 7 work proceeds in parallel: these five are inputs Phase 7 reads but does 
 || P7-01 | Execution context, budgets, secrets, stub gates | P1-04, P6-01 | cheap | done |
 || P7-02 | Router core | P7-01, P3-03, P3-04, P3-05, P4-11, P6-06 | expert | done |
 | P7-03 | Intent tiers: cache, deterministic, learning | P7-02, P4-07, P4-09, P6-04 | expert | review |
-| P7-04 | LLM tier and human hook | P7-03, P5-05 | review | review |
+| P7-04 | LLM tier and human hook | P7-03, P5-05 | review | done |
 | P7-05 | Trajectory recorder | P7-03, P6-05 | review | todo |
 | P7-06 | Trajectory replayer with healing | P7-04, P7-05 | review | todo |
 | P7-07 | TaskManager + `createRuntime()` | P7-06, P2-06, P2-07, P3-06, P5-04, P6-03 | review | todo |
