@@ -1,3 +1,5 @@
+import type { CreateRecordedInput } from '@browser-os/memory';
+import { pathTemplate } from '@browser-os/memory';
 import type {
   ActionResult,
   BrowserAction,
@@ -8,9 +10,7 @@ import type {
   TrajectoryStep,
   ValueSource,
 } from '@browser-os/protocol';
-import type { CreateRecordedInput } from '@browser-os/memory';
-import { pathTemplate } from '@browser-os/memory';
-import { hasTarget, isSensitiveField, MASKED_VALUE, fieldsOf } from '@browser-os/protocol';
+import { fieldsOf, hasTarget, isSensitiveField, MASKED_VALUE } from '@browser-os/protocol';
 import type { TrajectoryRecorderPort } from '../router/types.js';
 
 /**
@@ -67,11 +67,7 @@ function describeElement(result: ActionResult): string | null {
  * along untouched, a literal that equals a param value becomes a `param`
  * reference, any other literal survives only on a non-sensitive target.
  */
-function recordedValue(
-  action: BrowserAction,
-  params: Record<string, string>,
-  sensitiveTarget: boolean,
-): ValueSource {
+function recordedValue(action: BrowserAction, params: Record<string, string>, sensitiveTarget: boolean): ValueSource {
   if (action.type !== 'fill' && action.type !== 'select') {
     // Actions without a value (click, hover, …) keep whatever they came with.
     return (action as { value?: ValueSource }).value as ValueSource;
