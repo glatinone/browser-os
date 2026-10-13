@@ -125,8 +125,8 @@ Security pieces (`RiskClassifier`, `PermissionGate`, `HumanGate`) get **stub imp
 - Browser (fixture `spa`): second run of the same intent resolves via probe without a full observation (assert `observer.capture` not called, using a spy).
 
 **Acceptance criteria**
-- [ ] Zero model calls asserted in every cache/deterministic test
-- [ ] L12 printed (informational)
+- [x] Zero model calls asserted in every cache/deterministic test — ladder tests `expect(h.models.calls).toBe(0)` (6x); `resolveIntentTarget` unit tests take no `ModelsPort` at all (structural)
+- [x] L12 printed (informational) — micro test prints `L12 cache-tier action overhead: p50=0.061ms (budget <= 50ms)`
 
 ---
 
