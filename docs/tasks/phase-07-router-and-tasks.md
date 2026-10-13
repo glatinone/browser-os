@@ -86,8 +86,13 @@ Security pieces (`RiskClassifier`, `PermissionGate`, `HumanGate`) get **stub imp
 - Browser: click and fill on `basic` by ref from a real observation; obscured overlay button falls back to Playwright.
 
 **Acceptance criteria**
-- [ ] S20 test present
-- [ ] Router overhead (fake driver, fake observer) p50 ≤ 5 ms in a micro test
+- [x] S20 test present
+- [x] Router overhead (fake driver, fake observer) p50 ≤ 5 ms in a micro test
+
+**Progress note (run 68d5ecc4, 10 Okt 20:5xZ)** — *not done yet*, for whoever picks this up:
+- Done and green: `router.ts` runs steps A/B/C (ref + query via `observer.capture()`), F, G; S20 fallback rule; never-throws contract; `observer.invalidate(pageId)`; events `action.started`/`action.tier`/`action.completed`; `packages/runtime/test/router-core.test.ts` (11 unit tests) covers targetless navigate, ref happy path, ref-not-found, STALE_REF, query unique/ambiguous/not-found, fallback on `TARGET_OBSCURED`, no-fallback on `unknown`, verification failure, events order, p50 ≤ 5 ms. `pnpm build` 0 / `pnpm lint` 0 / `pnpm test` 583 passed, 2 skipped. Commits `b24c69d` (run 4519a0e2 WIP rescued) and `9fbdfba`.
+- Still open: requirement 1's `action_runs` persistence + `router/execute.ts`; requirement 4's `SessionManager.withPageLock` (router still takes no lock); requirement 7's `pageChanged` → session active page; stale-ref **heal** path untested (only the missing-old-index failure is); browser tests `test/router-core.browser.test.ts`.
+- Status stays `review` (expert supervision): do not move to `done` until the open list above is closed.
 
 ---
 
@@ -120,8 +125,8 @@ Security pieces (`RiskClassifier`, `PermissionGate`, `HumanGate`) get **stub imp
 - Browser (fixture `spa`): second run of the same intent resolves via probe without a full observation (assert `observer.capture` not called, using a spy).
 
 **Acceptance criteria**
-- [ ] Zero model calls asserted in every cache/deterministic test
-- [ ] L12 printed (informational)
+- [x] Zero model calls asserted in every cache/deterministic test — ladder tests `expect(h.models.calls).toBe(0)` (6x); `resolveIntentTarget` unit tests take no `ModelsPort` at all (structural)
+- [x] L12 printed (informational) — micro test prints `L12 cache-tier action overhead: p50=0.061ms (budget <= 50ms)`
 
 ---
 

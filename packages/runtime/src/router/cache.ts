@@ -13,14 +13,14 @@ const CACHE_MAX_CONSECUTIVE_MISSES = 3;
 const cacheMap = new Map<string, CacheEntry>();
 
 export const cache = {
-  async get(key: string): Promise<{ locator: any; status: 'active' | 'invalid' } | null> {
-    const entry = cache.get(key);
+  async get(key: string): Promise<{ locator: ElementLocator; status: 'active' | 'invalid' } | null> {
+    const entry = cacheMap.get(key);
     if (!entry || entry.status === 'invalid') return null;
     return { locator: entry.locator, status: entry.status };
   },
 
-  async put(key: string, locator: any): Promise<void> {
-    cache.set(key, {
+  async put(key: string, locator: ElementLocator): Promise<void> {
+    cacheMap.set(key, {
       locator,
       status: 'active',
       misses: 0,
@@ -30,7 +30,7 @@ export const cache = {
   },
 
   async recordHit(key: string): Promise<void> {
-    const entry = cache.get(key);
+    const entry = cacheMap.get(key);
     if (entry) {
       entry.misses = 0;
       entry.lastHit = Date.now();
@@ -38,10 +38,10 @@ export const cache = {
   },
 
   async recordMiss(key: string): Promise<void> {
-    const entry = cache.get(key);
+    const entry = cacheMap.get(key);
     if (entry) {
       entry.misses++;
-      if (entry.misses >= 3) {
+      if (entry.misses >= CACHE_MAX_CONSECUTIVE_MISSES) {
         entry.status = 'invalid';
       }
     }
@@ -49,14 +49,13 @@ export const cache = {
 };
 
 export function cacheKey(origin: string, pathTemplate: string, actionType: string, intent: string): string {
-  const normalized = intent.toLowerCase().trim().replace(/\s+/g, ' ');
-  return `intent:${origin}:${pathTemplate}:${actionType}:${intent.toLowerCase().trim().replace(/\s+/g, ' ')}`;
+  return `intent:${origin}:${pathTemplate}:${actionType}:${normalizeIntent(intent)}`;
 }
 
 function pathTemplate(url: string): string {
   try {
     const u = new URL(url);
-    return u.pathname.replace(/\/[^/]+/g, (m) => m.match(/\d+/) ? '/:id' : m);
+    return u.pathname.replace(/\/[^/]+/g, (m) => (m.match(/\d+/) ? '/:id' : m));
   } catch {
     return '/';
   }
