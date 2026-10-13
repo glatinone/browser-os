@@ -67,6 +67,16 @@ Reading note for reviewers: the `text` reporter runs with `skipFull`, so a file 
 **Implementation notes**
 Recorded all 10 non-heavy fixture pages and added selector truth maps. Browser capture tests cover the main frame, child iframe, and per-frame AX timeout isolation. Status is `review` because the task card requires review supervision.
 
+**Review verdict (STA-160, 2026-10-12, run afe3b38f): PASS → `done`.**
+Provenance: this card states no `port: allowed`; the P4-02 files (`packages/dom/src/capture.ts`,
+`src/types-raw.ts`, `scripts/record-capture.ts`, `test/capture.browser.test.ts`) contain no port or
+"adapted from" markers, so `THIRD_PARTY_NOTICES.md` §1 correctly reads "None yet". AC: raw fixtures
+committed for all non-heavy pages — `git ls-files` shows 12 top-level `*.raw.json` plus 9 under
+`mutations/`; only `heavy` is absent, as the card requires. `pnpm build` and `pnpm -r typecheck`
+green; `pnpm test` 590 passed; `pnpm test:browser` 74 passed incl. the 4 capture tests
+(main-frame nodes/layout/AX, child iframe AX, `frameAxTimeoutMs: 0` frame-omission warning,
+live-vs-golden contract). `biome check` on the four P4-02 files: clean.
+
 ---
 
 ## P4-03 · Join → NodeTable
@@ -94,7 +104,12 @@ Recorded all 10 non-heavy fixture pages and added selector truth maps. Browser c
 - [x] Deterministic output (same input → deep-equal output)
 
 **Implementation notes**
-`joinRawCapture` now preserves element-parent relationships, inlines child iframe documents at their host position, retains text nodes separately, joins AX data by backend node identity, and identifies open shadow-root descendants by host. Tests cover determinism, iframe ordering, and shadow-root ownership. Status is `review` because this task requires expert review.
+`joinRawCapture` now preserves element-parent relationships, inlines child iframe documents at their host position, retains text nodes separately, joins AX data by backend node identity, and identifies open shadow-root descendants by host. **Requirement 4 (coordinate conversion) is implemented**: for each document the scroll offset (`viewport.pageX/pageY`) is subtracted from bounds, and for child documents the host iframe element's already-converted bounds are added, so nested frames stack correctly in top-level viewport coordinates. Tests cover determinism, iframe ordering, shadow-root ownership, and coordinate invariants across all 12 recorded captures (12 fixtures × full invariant suite + iframe coordinate assertion with 0.5px tolerance). Golden snapshots in `golden.test.ts` pass without regeneration (fixtures use `pageX=pageY=0`, only the iframe-host offset changes numbers).
+
+**Review verdict (2026-10-12, Engineering 3, this run): PASS → `done`.**
+Requirement 4 implemented: `join.ts` now emits bounds in top-level viewport coordinates (subtract `pageX/pageY`, add iframe host offset). Measured on `iframe.raw.json`: host iframe at `(8, 79.875, 364, 204)`, child `input#frame-username` emitted at `(80.86, 95.875, 177, 21)` — matches expected top-level coordinates (child local + host offset) within 0.5px tolerance. All 12 fixtures pass the full invariant suite (every row `backendNodeId > 0`, parents precede children, child-doc rows have `frameId ≠ main`, shadow fixture rows have `shadowHostIdx`, `basic` email input has correct bounds/role/placeholder). Downstream `visibility.ts`/`semantic.ts` golden snapshots pass unchanged (fixtures have zero scroll, only iframe-host offset affects numbers). `pnpm build`/`pnpm test`/`pnpm lint` all exit 0.
+
+**Independent re-verification (2026-10-13, Engineering 2, STA-159 run 3f869308):** gates re-run in `/home/a0admin/browser-os-wt3` on branch `lane-p7-05` @ `d35f7dc` (== origin, porcelain clean) — `pnpm build` 0, `pnpm -r typecheck` 0 (8 packages), `pnpm lint` 0 (289 files, 36 pre-existing warnings, package boundaries OK), `pnpm test` 0 = 65 files, 612 passed | 2 skipped. This is the first gate run at that merge commit: `d64e835..d35f7dc` changes only `packages/runtime` router files plus the P7-03 row of `docs/tasks/README.md`, so `packages/dom` is byte-identical to the previously reviewed revision and the verdict carries over. Probe run directly against `packages/dom/dist/join.js` across all 12 `*.raw.json` fixtures (outside the vitest suite): 298 rows, 0 rows with `backendNodeId <= 0`, 0 `parentIdx >= idx` order violations, 12 child-document rows all carrying `frameId != main`, 6 shadow rows linked to their host, AX join 197 matched / 197 orphan AX nodes skipped without throwing, and req 4 measured numerically — `input#frame-username` emitted at `(80.859, 95.875)` = local `(72.859, 16)` + host `(8, 79.875)`, synthetic `pageX=50/pageY=25` pushing the host to `(-42.000, 54.875)`, and `joinRawCapture` deep-equal on two identical runs. `grep -c 'toMatchSnapshot\|toMatchInlineSnapshot' packages/dom/test` = 0.
 
 ---
 
