@@ -160,11 +160,11 @@ Also added a negative for a non-modal dialog, since §5 scopes only on `modal ==
 **Tests:** above, plus unit tests for the role fallback table, name fallbacks and context formatting.
 
 **Acceptance criteria**
-- [ ] Goldens reviewed by a human/expert before `done` (they define expected behaviour)
+- [x] Goldens reviewed by a human/expert before `done` (they define expected behaviour)
 - [x] The `basic` golden contains the icon button as `button "Settings"` and the disabled button with `(disabled)`
 
 **Implementation notes**
-Semantic output now follows the field rules: role fallback per tag, name fallback chain, select options in the name, password and sensitive masking, AX description priority, frame labels, two nearest contexts, grouped text blocks with heading levels, modal scoping computed once, and token estimate from the serialized lines. Goldens cover all 12 non-heavy fixtures; `basic` asserts the Settings icon button and the disabled button. A live browser test checks the basic element contract. Status is `review` because the task card and the golden review gate require expert review.
+Semantic output now follows the field rules: role fallback per tag, name fallback chain, select options in the name, password and sensitive masking, AX description priority, frame labels, two nearest contexts, grouped text blocks with heading levels, modal scoping computed once, and token estimate from the serialized lines. Goldens cover all 12 non-heavy fixtures; `basic` asserts the Settings icon button and the disabled button. A live browser test checks the basic element contract. Expert review (12 Okt, STA-161) confirmed all 12 goldens regenerate byte-identically and both card ACs pass; status is `done`.
 
 ---
 
