@@ -36,6 +36,7 @@ assertion.**
 | P4-09 | probe round-trip budget assertions |
 | P4-08 | round-trip passes on all 12 fixtures (expert review 2026-10-12) |
 | P5-05 | prompt carries the untrusted-data framing sentence |
+| P5-01 | expert review 14 Okt (Eng 5 run `70a6d4bf`): AC "used by router tests to assert calls === 0" holds — `router-intent.test.ts:383` + 7 zero-call assertions on deterministic paths |
 
 Promoted later, 2026-10-12, by expert review **STA-160** (Engineering 3, run `afe3b38f`): its AC is
 not a test assertion but a provenance check, and it now passes — see the table below.
@@ -51,7 +52,6 @@ not a test assertion but a provenance check, and it now passes — see the table
 | P4-02 | provenance — predates this session, no `port: allowed`, `THIRD_PARTY_NOTICES.md` reads "None yet" |
 | P4-03 | supervision `expert` **and** provenance |
 | P4-05 | judgment — 12 goldens define later phases; card requires human/expert review |
-| P5-01 | AC needs Phase 7 router tests, which do not exist yet |
 | P5-02 | AC needs a manual Ollama run; not installed here |
 
 Phase 7 work proceeds in parallel: these four are inputs Phase 7 reads but does not modify.
@@ -102,7 +102,7 @@ Phase 7 work proceeds in parallel: these four are inputs Phase 7 reads but does 
 | P4-11 | Observer (runtime) | P4-06, P4-08, P2-07 | cheap | done |
 | P4-12 | Mutation fixtures + locator robustness suite | P4-08 | cheap | done |
 | **Phase 5** | **AI providers** | | | |
-| P5-01 | FakeModelProvider | P1-02 | cheap | review |
+| P5-01 | FakeModelProvider | P1-02 | cheap | done |
 | P5-02 | OpenAI-compatible provider | P5-01 | cheap | review |
 | P5-03 | Anthropic provider | P5-02 | cheap | done |
 | P5-04 | Model registry from config | P5-02, P5-03, P1-03 | cheap | done |

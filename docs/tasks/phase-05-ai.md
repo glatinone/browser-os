@@ -26,13 +26,26 @@ Read first: `docs/specs/data-models.md` §9, `docs/specs/action-router.md` §5.2
 **Tests:** counts, latency (fake timers), error propagation, truthResponder.
 
 **Acceptance criteria**
-- [ ] Used by all later router tests to assert `calls === 0` on deterministic paths
+- [x] Used by all later router tests to assert `calls === 0` on deterministic paths
 
 **Status note**
 `FakeModelProvider` itself is implemented and covered (`test/fake-provider.test.ts`: call
 counting, `reset()`, fake-timer latency, error propagation, `truthResponder`). This acceptance
 criterion cannot be evaluated yet: there is no router, because Phase 7 (`P7-02`/`P7-03`) has not
 started. It stays unchecked until those tests exist — see `docs/tasks/README.md`.
+
+**Expert review (2026-10-14, Engineering 5 run `70a6d4bf`): AC now proven — Phase 7 router tests
+exist.** `packages/runtime/test/router-intent.test.ts:383` builds the ActionRouter harness with
+`new FakeModelProvider({ responder: {} })` and asserts `expect(h.models.calls).toBe(0)` on the
+cache/deterministic paths at seven sites (lines 507, 530, 548, 567, 593, 613, 637), plus the
+structural `llm.calls === 0` at 531. Requirements map: constructor + responder union
+`fake-provider.ts:13-27`; `requests`/`calls`/`reset()` `:15`,`:29-35`; simulated latency via
+`setTimeout` `:40` proven with fake timers at 800 ms (`fake-provider.test.ts:33-41`); usage
+`ceil(chars/4)` `:48-53` (exact-values probe: 12-char JSON body -> `outputTokens: 3`);
+`truthResponder` `:60-73` (`fake-provider.test.ts:48-53`). Gates at `lane-p4-05` HEAD (merge of
+`origin/lane-p4-02`): `pnpm build`/`pnpm test`/`pnpm run lint` exit 0; full vitest tree 719
+passed / 3 skipped (skips attributed: 2 Windows `skipIf` in `profiles.test.ts`, 1 `it.skip` in
+the P7-03 browser suite); biome 0 errors, package boundaries OK. Verdict PASS -> `done`.
 
 ---
 
