@@ -74,15 +74,19 @@ the P7-03 browser suite); biome 0 errors, package boundaries OK. Verdict PASS ->
 **Tests (fake server):** success with json_schema; success with json_object; 429 then success; 500×3 → `LLM_UNAVAILABLE`; timeout; malformed JSON content → `json` undefined and `text` preserved; missing API key; the request never contains the key in the body.
 
 **Acceptance criteria**
-- [ ] Works against Ollama (`http://localhost:11434/v1`) in a **manual** check (documented in the package README; not in CI)
+- [x] Works against Ollama (`http://localhost:11434/v1`) in a **manual** check (documented in the package README; not in CI)
 
 **Status note**
-The documented half is done: `packages/ai/README.md` now carries the exact manual procedure
-(`ollama serve` → `ollama pull` → one request through `ModelRegistry`), plus what to expect and
-when to keep `supportsJsonSchema` off. The run itself is pending — Ollama is not installed on
-this machine, and the card explicitly keeps it out of CI. Checklist: 429→success, 500×2 then
-success, 500×3→`LLM_UNAVAILABLE`, timeout, malformed JSON, missing key, key absent from the body
-all covered by `test/openai-compatible.test.ts`.
+Both halves are now done. The documented procedure (`ollama serve` -> `ollama pull` -> one request
+through `ModelRegistry`) was executed by hand on 2026-10-14 (Eng 5 run `8eff0657`, ollama 0.40.4,
+llama3.2): the request went through `OpenAiCompatibleProvider` via `ModelRegistry.fromConfig`, the
+server answered `{"ref":null}` and the provider parsed it (`usage` read from
+`usage.prompt_tokens`/`completion_tokens`). Checklist: 429->success, 500x2 then
+success, 500x3->`LLM_UNAVAILABLE`, timeout, malformed JSON, missing key, key absent from the body
+all covered by `test/openai-compatible.test.ts` (6/6 verbose) and re-probed against a fake HTTP
+server driving the built `dist/openai-compatible.js` (wire url `/v1/chat/completions`,
+`json_schema` strict payload, `json_object` + prompt-append fallback, `max_completion_tokens`
+switch, image parts as `image_url` data URLs, `Retry-After` honored, key header-only).
 
 ---
 
