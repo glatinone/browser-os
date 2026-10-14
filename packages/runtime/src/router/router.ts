@@ -10,7 +10,7 @@ import type {
   TierAttempt,
   ValueSource,
 } from '@browser-os/protocol';
-import { ERROR_CODES, type ErrorCode, hasTarget } from '@browser-os/protocol';
+import { ERROR_CODES, type ErrorCode, fieldsOf, hasTarget, isSensitiveField } from '@browser-os/protocol';
 import { BosError, isBosError } from '../errors.js';
 import type { HumanGate, PermissionGate, RiskClassifier } from '../security/interfaces.js';
 import { DEFAULT_ROUTER_CONSTANTS } from './constants.js';
@@ -185,6 +185,21 @@ export class ActionRouter {
       this.events.emit({ ts: startedAt, type: 'action.tier', data: { actionId, attempt: lastAttempt } });
     }
 
+    // S13 (memory §6.1 sensitive literal guard): while a task is recording, a
+    // literal typed into a sensitive field is rejected BEFORE the driver is
+    // called, so a password can never enter a trajectory — nor a browser.
+    if (this.recorder?.isRecording() === true && (action.type === 'fill' || action.type === 'select')) {
+      if (action.value.kind === 'literal' && isSensitiveField(fieldsOf(resolved.entry.locator))) {
+        return this.finish(actionId, startedAt, ctx, action, {
+          ok: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'use a secret reference for sensitive fields while recording',
+          },
+        });
+      }
+    }
+
     // F. Execute with driver fallback
     const value = await this.resolveValue('value' in action ? action.value : undefined, ctx);
     const resolvedTarget: ResolvedTarget = toResolvedTarget(resolved);
@@ -240,20 +255,27 @@ export class ActionRouter {
     // not verify never counts as a hit.
     this.learn(resolved, target.kind === 'intent', ctx.params);
 
-    return this.finish(actionId, startedAt, ctx, action, {
-      ok: true,
+    return this.finish(
+      actionId,
+      startedAt,
+      ctx,
       action,
-      tier: resolved.tier,
-      driver: dispatched.via,
-      attempts,
-      element: resolved.element,
-      locator: resolved.entry.locator,
-      url: aftermath.url || aftermathUrl(dispatched.result, resolved),
-      pageChanged: changed,
-      ms: ctx.clock.now() - startedAt,
-      llm: { calls: 0, inputTokens: 0, outputTokens: 0 },
-      risk: riskResult.risk,
-    });
+      {
+        ok: true,
+        action,
+        tier: resolved.tier,
+        driver: dispatched.via,
+        attempts,
+        element: resolved.element,
+        locator: resolved.entry.locator,
+        url: aftermath.url || aftermathUrl(dispatched.result, resolved),
+        pageChanged: changed,
+        ms: ctx.clock.now() - startedAt,
+        llm: { calls: 0, inputTokens: 0, outputTokens: 0 },
+        risk: riskResult.risk,
+      },
+      target.kind === 'intent' ? target.text : (opts.healIntent ?? null),
+    );
   }
 
   private async executeTargetless(
@@ -513,6 +535,8 @@ export class ActionRouter {
     ctx: ExecutionContext,
     action: BrowserAction,
     result: Partial<ActionResult> & { ok: boolean; error?: ActionResult['error'] },
+    /** The heal intent of the call that produced this action, if any (P7-05 step intent). */
+    healIntent: string | null = null,
   ): ActionResult {
     const built: ActionResult = {
       ok: result.ok,
@@ -533,9 +557,12 @@ export class ActionRouter {
 
     persistRun(this.runs, ctx, built);
 
-    // P7-05: a trajectory records what reached the risk gate; failures before it are not in it.
-    if (ctx.taskId !== null && this.recorder !== null && this.recorder.isRecording() && built.risk !== null) {
-      this.recorder.append(built, ctx, null, built.risk);
+    // P7-05: only successful actions enter a trajectory (memory §6.1); failures
+    // before the risk gate (target resolution, permission, the S13 guard) are
+    // never in it. A targetless action (navigate, wait) never reached the
+    // classifier — its step carries `low`; replay re-classifies live risk (S9).
+    if (ctx.taskId !== null && this.recorder !== null && this.recorder.isRecording() && built.ok) {
+      this.recorder.append(built, ctx, healIntent ?? null, built.risk ?? 'low');
     }
 
     this.events.emit({ ts: ctx.clock.now(), type: 'action.completed', data: { actionId, result: built } });
