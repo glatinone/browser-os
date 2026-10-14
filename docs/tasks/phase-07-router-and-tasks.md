@@ -151,7 +151,31 @@ Security pieces (`RiskClassifier`, `PermissionGate`, `HumanGate`) get **stub imp
 **Tests:** ambiguous intent → LLM picks a ref (truthResponder); LLM returns out-of-list ref → next tier; budget exhausted → no call; a human `ref` answer writes the cache; a `done` answer; `login` fixture with the stub gate → `SECURITY_CHALLENGE`.
 
 **Acceptance criteria**
-- [ ] No prompt contains a secret or password value (canary in test)
+- [x] No prompt contains a secret or password value (canary in test)
+
+**Implementation notes (2026-10-13, lane p7-04, run 53c45b00)**
+- Tiers 3–5 are wired inside `resolve-intent.ts` (`resolveIntentTarget`), not as
+  separate router entry points: the router passes `action`, `ctx`, `models`,
+  `vision` and `humanGate` into the ladder, which keeps the ladder order
+  (cache → deterministic → llm → vision → human) in one place.
+- `HumanDone` (`{ tier: 'human', done: true }`) is a first-class ladder outcome:
+  `router.ts` returns `ok: true` without dispatching, without risk classification
+  and without a cache write (there was no resolution to learn).
+- `LadderAttempt` widens protocol `TierAttempt` so ladder diagnostics
+  (`locator_not_found`, `challenge`, …) are recordable; the router's own
+  `TierAttempt[]` stays assignable to it.
+- The security-challenge pause (§4 step D) lives at the capture that observed the
+  wall, inside the ladder, before resolution continues — ref/locator/query
+  targets resolve an explicit ref and never re-inspect the page.
+- `models`/`vision` are optional on `RouterCoreDeps` (like `human`), so a
+  P7-02-era constructor keeps compiling: absent → `LLM_DISABLED` attempt and
+  vision never claims a target.
+- AC canary: `router-tiers.test.ts` serialises the exact prompt the ladder sends
+  and asserts the raw secret never appears (mask only).
+
+**Verification (run 53c45b00):** `pnpm build`, `pnpm -r typecheck`,
+`pnpm test` (638 passed / 2 skipped), `pnpm lint` (biome 0 errors, 38
+pre-existing warnings, boundaries OK), `pnpm test:browser` (74 passed).
 
 ---
 

@@ -31,6 +31,8 @@ import type {
   ActionCachePort,
   DisabledTier,
   ExecuteOptions,
+  HumanDone,
+  ModelsPort,
   ObserverPort,
   PageContext,
   PagesPort,
@@ -39,6 +41,7 @@ import type {
   RunPort,
   SessionsPort,
   TrajectoryRecorderPort,
+  VisionResolver,
 } from './types.js';
 import { toResolvedTarget } from './verify.js';
 
@@ -70,6 +73,8 @@ export class ActionRouter {
   private readonly risk: RiskClassifier;
   private readonly permissions: PermissionGate;
   private readonly human: HumanGate | null;
+  private readonly models: ModelsPort | null;
+  private readonly vision: VisionResolver | null;
   private readonly events: Pick<EventBus, 'emit'>;
   private readonly recorder: TrajectoryRecorderPort | null;
   private readonly constants: typeof DEFAULT_ROUTER_CONSTANTS;
@@ -85,6 +90,8 @@ export class ActionRouter {
     this.risk = deps.risk;
     this.permissions = deps.permissions;
     this.human = deps.human;
+    this.models = deps.models ?? null;
+    this.vision = deps.vision ?? null;
     this.events = deps.events;
     this.recorder = deps.recorder ?? null;
     this.constants = { ...DEFAULT_ROUTER_CONSTANTS, ...deps.constants };
@@ -139,7 +146,7 @@ export class ActionRouter {
     const target = ('target' in action ? action.target : undefined) as Target;
 
     // C. Resolve target
-    let resolved: Resolution;
+    let resolved: Resolution | HumanDone;
     const attempts: TierAttempt[] = [];
     try {
       resolved = await this.resolveTarget(action, target, ctx, attempts, opts.healIntent ?? null);
@@ -148,7 +155,24 @@ export class ActionRouter {
       return this.finish(actionId, startedAt, ctx, action, { ok: false, error: this.toResultError(error) });
     }
 
-    // D. Security challenge check — arrives with the vision tier (P7-04).
+    // D. Security challenge check — §4 step D is served inside the intent
+    // ladder, at the capture that observed the wall (resolve-intent), where it
+    // pauses through HumanGate before resolution continues; Ref/locator/query
+    // targets resolve an explicit ref and never re-inspect the page here.
+    //
+    // §5.3.2: every tier declined and the human said the step is already done
+    // by hand — ok:true with nothing dispatched, nothing risked, no cache write
+    // (there was no resolution to learn).
+    if ('done' in resolved) {
+      const lastDone = attempts[attempts.length - 1];
+      if (lastDone) this.events.emit({ ts: startedAt, type: 'action.tier', data: { actionId, attempt: lastDone } });
+      return this.finish(actionId, startedAt, ctx, action, {
+        ok: true,
+        action,
+        tier: resolved.tier,
+        attempts,
+      });
+    }
 
     // E. Risk + permission
     const riskResult = this.risk.classify(action, resolved.element, resolved.url, ctx.policy);
@@ -378,16 +402,16 @@ export class ActionRouter {
     ctx: ExecutionContext,
     attempts: TierAttempt[],
     healIntent: string | null,
-  ): Promise<Resolution> {
+  ): Promise<Resolution | HumanDone> {
     switch (target.kind) {
       case 'ref':
         return this.resolveRefTarget(target, ctx, attempts);
       case 'locator':
-        return this.resolveLocatorTarget(target, ctx, attempts, healIntent, action.type);
+        return this.resolveLocatorTarget(target, ctx, attempts, healIntent, action);
       case 'query':
         return this.resolveQueryTarget(target, ctx, attempts);
       case 'intent':
-        return this.resolveIntentTarget(action.type, target, ctx, attempts, healIntent);
+        return this.resolveIntentTarget(action, target, ctx, attempts, healIntent);
       default:
         throw new BosError('INVALID_REQUEST', `Unknown target kind: ${String((target as Target).kind)}`);
     }
@@ -417,8 +441,8 @@ export class ActionRouter {
     ctx: ExecutionContext,
     attempts: TierAttempt[],
     healIntent: string | null,
-    actionType: ActionType,
-  ): Promise<Resolution> {
+    action: BrowserAction,
+  ): Promise<Resolution | HumanDone> {
     // Trajectory replay target — action-router §5 case 'locator', tier 1.
     // The locator is trusted, so it goes straight through tryResolveLocator
     // (probe → fingerprint match). No cache read/write: a locator target is
@@ -428,7 +452,7 @@ export class ActionRouter {
       observer: this.observer,
       cache: this.cache,
       constants: this.constants,
-      actionType,
+      actionType: action.type,
       sessionId: ctx.sessionId,
       pageId: ctx.pageId,
       cdp: null,
@@ -440,7 +464,7 @@ export class ActionRouter {
     // §5.4: the locator failed, so resolution continues as the healed intent
     // from tier 2 onward. The action cache is not consulted again, which the
     // ladder expresses as an intent that skips tier 1 entirely.
-    return this.resolveIntentTarget(actionType, { kind: 'intent', text: healIntent }, ctx, attempts, null, true);
+    return this.resolveIntentTarget(action, { kind: 'intent', text: healIntent }, ctx, attempts, null, true);
   }
 
   private async resolveQueryTarget(
@@ -455,25 +479,29 @@ export class ActionRouter {
   }
 
   private async resolveIntentTarget(
-    actionType: ActionType,
+    action: BrowserAction,
     target: Extract<Target, { kind: 'intent' }>,
     ctx: ExecutionContext,
     attempts: TierAttempt[],
     healIntent: string | null,
     skipCache = false,
-  ): Promise<Resolution> {
+  ): Promise<Resolution | HumanDone> {
     const pageContext = await this.pages.context(ctx.sessionId, ctx.pageId);
 
     return resolveIntentTarget(
       {
         intent: target.text,
-        actionType,
+        actionType: action.type,
         url: pageContext.url ?? undefined,
         sessionId: ctx.sessionId,
         pageId: ctx.pageId,
         params: ctx.params,
         healIntent,
         skipCache,
+        // P7-04: the ladder's tiers 3–5 (llm / vision / human) read the
+        // action, the shared context and its gate straight from the router.
+        action,
+        ctx,
       },
       attempts,
       {
@@ -484,6 +512,9 @@ export class ActionRouter {
         cdp: pageContext.cdp,
         worlds: pageContext.worlds,
         mainCdpFrameId: pageContext.mainCdpFrameId,
+        models: this.models,
+        vision: this.vision,
+        humanGate: this.human,
       },
     );
   }
@@ -550,7 +581,9 @@ export class ActionRouter {
       pageChanged: result.pageChanged ?? false,
       extracted: result.extracted,
       ms: ctx.clock.now() - startedAt,
-      llm: { calls: 0, inputTokens: 0, outputTokens: 0 },
+      // The per-action counter is the LLM budget §5.2 consumed (token counts
+      // are not tracked per call yet); run-store persists it into action_runs.
+      llm: { calls: ctx.budget.llmCallsAction ?? 0, inputTokens: 0, outputTokens: 0 },
       risk: result.risk ?? null,
       error: result.error,
     };

@@ -46,12 +46,6 @@ not a test assertion but a provenance check, and it now passes — see the table
 | P4-02 | AC "raw fixtures committed for all non-heavy fixture pages" holds (21 `*.raw.json` tracked: 12 top-level + 9 `mutations/`, only `heavy` absent as the card requires) and the provenance gate passes: the card states no `port: allowed`, the P4-02 files carry no port/adaptation markers, and `THIRD_PARTY_NOTICES.md` correctly reads "None yet". `pnpm build`, `pnpm -r typecheck`, `pnpm test` (590 passed) and `pnpm test:browser` (74 passed) all green. |
 | P4-03 | Requirement 4 (coordinate conversion) implemented in `join.ts`: subtracts `viewport.pageX/pageY` and adds iframe host offset. Measured on `iframe.raw.json`: host at `(8, 79.875, 364, 204)`, child `input#frame-username` at `(80.86, 95.875, 177, 21)` — top-level coords within 0.5px tolerance. All 12 fixtures pass full invariant suite (backendNodeId > 0, parents precede children, child-doc `frameId ≠ main`, shadow `shadowHostIdx`, `basic` email bounds/role/placeholder). Golden snapshots pass unchanged. `pnpm build`/`pnpm test`/`pnpm lint` exit 0. |
 | P7-05 | Expert review 13 Okt (STA-202/STA-211, Engineering 5, run `1ead2c2a`), HEAD `a528878` == `origin/lane-p7-05`, worktree clean. Every memory §6.1 table row has a dedicated test in `packages/runtime/test/recorder.test.ts` (17 tests: templated navigate URL, param/secret refs kept, literal→param promotion, literal kept on non-sensitive / masked on sensitive target, intent capture incl. `"<role> \"<name>\""` form, human-manual `{kind:'intent'}` target per router §5.3, router risk carried on step, `post.urlPattern` only on `pageChanged`); compaction rules tested (consecutive fills collapse to last, `wait`+`waitFor` dropped with dense indices); `finalize(false)` discards → null, `finalize(true)` persists version-1 trajectory with origin/params/secret names. S13 guard verified at `router.ts:188-201` — rejected before the driver is called, proven by a fake driver with call count 0. Gates re-run on the merge of `a528878` into this lane: `pnpm build` exit 0, full `vitest run` 719 passed / 3 skipped, `biome check .` 0 errors, `check-boundaries.mjs` OK. |
-
-| Stays in `review` | Why the decision keeps it there |
-|---|---|
-| P4-02 | provenance — predates this session, no `port: allowed`, `THIRD_PARTY_NOTICES.md` reads "None yet" |
-| P4-03 | supervision `expert` **and** provenance |
-| P4-05 | judgment — 12 goldens define later phases; card requires human/expert review |
 | P5-02 | AC needs a manual Ollama run; not installed here |
 
 Phase 7 work proceeds in parallel: these four are inputs Phase 7 reads but does not modify.
@@ -117,8 +111,8 @@ Phase 7 work proceeds in parallel: these four are inputs Phase 7 reads but does 
 | **Phase 7** | **Router + tasks → M3** | | | |
 || P7-01 | Execution context, budgets, secrets, stub gates | P1-04, P6-01 | cheap | done |
 || P7-02 | Router core | P7-01, P3-03, P3-04, P3-05, P4-11, P6-06 | expert | done |
-| P7-03 | Intent tiers: cache, deterministic, learning | P7-02, P4-07, P4-09, P6-04 | expert | review |
-| P7-04 | LLM tier and human hook | P7-03, P5-05 | review | todo |
+| P7-03 | Intent tiers: cache, deterministic, learning | P7-02, P4-07, P4-09, P6-04 | expert | done |
+| P7-04 | LLM tier and human hook | P7-03, P5-05 | review | done |
 | P7-05 | Trajectory recorder | P7-03, P6-05 | review | done |
 | P7-06 | Trajectory replayer with healing | P7-04, P7-05 | review | todo |
 | P7-07 | TaskManager + `createRuntime()` | P7-06, P2-06, P2-07, P3-06, P5-04, P6-03 | review | todo |

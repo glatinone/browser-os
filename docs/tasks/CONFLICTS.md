@@ -53,3 +53,25 @@ Template:
 - Status: RESOLVED (implemented in P0-01). `pnpm-workspace.yaml` carries the key with a comment naming the pnpm 12
   rename, so the next agent does not repeat the `onlyBuiltDependencies` dead end. Future native deps
   (`playwright-core` in P2-04, `better-sqlite3` in P6-01) must be added there deliberately, not by approving broadly.
+## 2026-10-12 — P7-04 — LLM/human tiers exist but the intent ladder they extend is un-wired (P7-03 still `todo`)
+- Conflict: P7-04's card lists `depends_on: P7-03, P5-05` and its requirements are the LLM and human
+  tiers of the *intent* resolution ladder (action-router §5, tiers 3–5). P5-05 is done. P7-03 is
+  still `todo`, yet `packages/runtime/src/router/resolve-locator.ts` (committed as
+  `39128d9 feat(P7-03): tier 1 cache locator resolution`) already sits on this branch **un-wired**:
+  nothing in `packages/runtime/src/` imports it, and `ActionRouter.resolveIntentTarget`
+  (`packages/runtime/src/router/router.ts:367-374`) still throws
+  `BosError('TARGET_NOT_FOUND', 'Intent resolution not implemented')`. So the deterministic tier
+  (tier 2) does not run either, and no end-to-end test can exercise tier 3.
+  Meanwhile `docs/CODING_AGENT.md` §5.11 forbids changing the router tier order without an ADR,
+  and §4.2 forbids doing the next task ("Do not 'also quickly do' the next one"), so P7-04 may not
+  silently finish P7-03.
+- Options: **A** ship tiers 3–5 as self-contained modules with their own tests, leaving the router
+  un-wired (tests call the tier functions directly); **B** also wire the intent ladder in
+  `router.ts`, which means doing P7-03's work inside P7-04 (violates §4.2 and blurs review
+  ownership); **C** block P7-04 until P7-03 is done.
+- Recommendation: **A**. It keeps lane ownership clean, it is the only option that produces
+  verifiable output this run, and the wiring is a small, reviewable diff once P7-03 lands —
+  `resolveLlmTier` / `resolveHumanTier` are already shaped to drop into the tier-3 / tier-5
+  positions of `resolveIntentTarget`. Requirement 5's `SECURITY_CHALLENGE` path is implemented in
+  the new module and tested there, and will be picked up verbatim when the ladder is wired.
+- Status: OPEN (recommendation A taken this run; awaiting expert review of P7-04, and P7-03 landing).
