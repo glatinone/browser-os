@@ -34,6 +34,7 @@ assertion.**
 | P4-06 | no false positive on non-login fixtures |
 | P4-07 | ≥ 99% precision at 0.75 / 0.15 |
 | P4-09 | probe round-trip budget assertions |
+| P4-08 | round-trip passes on all 12 fixtures (expert review 2026-10-12) |
 | P5-05 | prompt carries the untrusted-data framing sentence |
 
 Promoted later, 2026-10-12, by expert review **STA-160** (Engineering 3, run `afe3b38f`): its AC is
@@ -49,11 +50,11 @@ not a test assertion but a provenance check, and it now passes — see the table
 |---|---|
 | P4-02 | provenance — predates this session, no `port: allowed`, `THIRD_PARTY_NOTICES.md` reads "None yet" |
 | P4-03 | supervision `expert` **and** provenance |
-| P4-08 | supervision `expert` |
+| P4-05 | judgment — 12 goldens define later phases; card requires human/expert review |
 | P5-01 | AC needs Phase 7 router tests, which do not exist yet |
 | P5-02 | AC needs a manual Ollama run; not installed here |
 
-Phase 7 work proceeds in parallel: these five are inputs Phase 7 reads but does not modify.
+Phase 7 work proceeds in parallel: these four are inputs Phase 7 reads but does not modify.
 
 ---
 
@@ -95,7 +96,7 @@ Phase 7 work proceeds in parallel: these five are inputs Phase 7 reads but does 
 | P4-05 | Semantic output, serialization, goldens | P4-04 | review | done |
 | P4-06 | Security challenge detection | P4-05 | cheap | done |
 | P4-07 | Lexical ranking (deterministic tier) | P4-05 | review | done |
-| P4-08 | Locator build, cssPath, matching | P4-05 | expert | review |
+| P4-08 | Locator build, cssPath, matching | P4-05 | expert | done |
 | P4-09 | Probe (cache fast path) | P4-08, P2-03 | review | done |
 | P4-10 | Playwright ariaSnapshot oracle test | P4-05 | cheap | done |
 | P4-11 | Observer (runtime) | P4-06, P4-08, P2-07 | cheap | done |
