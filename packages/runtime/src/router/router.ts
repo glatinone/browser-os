@@ -14,6 +14,7 @@ import { ERROR_CODES, type ErrorCode, hasTarget } from '@browser-os/protocol';
 import { BosError, isBosError } from '../errors.js';
 import type { HumanGate, PermissionGate, RiskClassifier } from '../security/interfaces.js';
 import { DEFAULT_ROUTER_CONSTANTS } from './constants.js';
+import { consumeLlmCall } from './context.js';
 import {
   type Aftermath,
   attempt,
@@ -24,15 +25,15 @@ import {
   verifyAndSettle,
 } from './execute.js';
 import { learnFromResolution, resolveIntentTarget } from './resolve-intent.js';
-import { applyLearning, tryResolveLocator } from './resolve-locator.js';
+import { tryResolveLocator } from './resolve-locator.js';
 import { resolveQuery } from './resolve-query.js';
 import { resolveRef } from './resolve-ref.js';
 import type {
   ActionCachePort,
   DisabledTier,
   ExecuteOptions,
+  ModelsPort,
   ObserverPort,
-  PageContext,
   PagesPort,
   Resolution,
   RouterCoreDeps,
@@ -70,6 +71,7 @@ export class ActionRouter {
   private readonly risk: RiskClassifier;
   private readonly permissions: PermissionGate;
   private readonly human: HumanGate | null;
+  private readonly models: ModelsPort | null;
   private readonly events: Pick<EventBus, 'emit'>;
   private readonly recorder: TrajectoryRecorderPort | null;
   private readonly constants: typeof DEFAULT_ROUTER_CONSTANTS;
@@ -85,6 +87,7 @@ export class ActionRouter {
     this.risk = deps.risk;
     this.permissions = deps.permissions;
     this.human = deps.human;
+    this.models = deps.models ?? null;
     this.events = deps.events;
     this.recorder = deps.recorder ?? null;
     this.constants = { ...DEFAULT_ROUTER_CONSTANTS, ...deps.constants };
@@ -109,6 +112,10 @@ export class ActionRouter {
       );
     } catch (error) {
       if (isBosError(error) && error.code === 'CANCELLED') throw error;
+      if (process.env.BOS_TRACE === '1') {
+        const trace = error as { constructor?: { name?: string }; code?: unknown; message?: unknown };
+        console.error('execute catch:', trace?.constructor?.name, trace?.code, trace?.message);
+      }
       // Either the lock could not be taken (unknown session or page) or something threw
       // that should not have: still an ActionResult, and still its action_runs row.
       return this.finish(actionId, startedAt, ctx, action, { ok: false, error: this.toResultError(error) });
@@ -146,6 +153,29 @@ export class ActionRouter {
     } catch (error) {
       if (isBosError(error) && error.code === 'CANCELLED') throw error;
       return this.finish(actionId, startedAt, ctx, action, { ok: false, error: this.toResultError(error) });
+    }
+
+    // §5.3 done answer: the human performed the step; the router returns ok without
+    // executing or learning. Step D (challenge) does not apply here (the human saw it).
+    if (resolved.done) {
+      this.events.emit({
+        ts: startedAt,
+        type: 'action.tier',
+        data: { actionId, attempt: attempts[attempts.length - 1] ?? { tier: 'human', ok: true, ms: 0 } },
+      });
+      return this.finish(actionId, startedAt, ctx, action, {
+        ok: true,
+        action,
+        tier: resolved.tier,
+        driver: null,
+        attempts,
+        element: resolved.element,
+        url: resolved.url,
+        pageChanged: false,
+        ms: ctx.clock.now() - startedAt,
+        llm: { calls: 0, inputTokens: 0, outputTokens: 0 },
+        risk: null,
+      });
     }
 
     // D. Security challenge check — arrives with the vision tier (P7-04).
@@ -462,6 +492,13 @@ export class ActionRouter {
         cdp: pageContext.cdp,
         worlds: pageContext.worlds,
         mainCdpFrameId: pageContext.mainCdpFrameId,
+        models: this.models,
+        human: this.human,
+        exec: {
+          taskId: ctx.taskId,
+          humanTimeoutMs: ctx.policy.budgets.humanTimeoutMs,
+          consumeLlmCall: () => consumeLlmCall(ctx),
+        },
       },
     );
   }
@@ -534,7 +571,7 @@ export class ActionRouter {
     persistRun(this.runs, ctx, built);
 
     // P7-05: a trajectory records what reached the risk gate; failures before it are not in it.
-    if (ctx.taskId !== null && this.recorder !== null && this.recorder.isRecording() && built.risk !== null) {
+    if (ctx.taskId && this.recorder?.isRecording() && built.risk !== null) {
       this.recorder.append(built, ctx, null, built.risk);
     }
 

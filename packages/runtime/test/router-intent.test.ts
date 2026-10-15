@@ -229,7 +229,7 @@ describe('resolveIntentTarget (P7-03 intent tier ladder)', () => {
     });
 
     expect(result.tier).toBe('deterministic');
-    expect(attempts).toContainEqual(expect.objectContaining({ tier: 'cache', ok: false, reason: 'locator_not_found' }));
+    expect(attempts).toContainEqual(expect.objectContaining({ tier: 'cache', ok: false, reason: 'TARGET_NOT_FOUND' }));
     expect(attempts).toContainEqual(expect.objectContaining({ tier: 'deterministic', ok: true }));
     expect(cache.recordMiss).toHaveBeenCalledWith('cache:key1');
     expect(driver.cdpPerform).not.toHaveBeenCalled();
@@ -300,6 +300,215 @@ describe('resolveIntentTarget (P7-03 intent tier ladder)', () => {
 
     expect(attempts).toContainEqual(
       expect.objectContaining({ tier: 'deterministic', ok: false, reason: 'TARGET_NOT_FOUND' }),
+    );
+    expect(driver.cdpPerform).not.toHaveBeenCalled();
+  });
+
+  // ── P7-04: tier 3 (LLM) and tier 5 (human) ─────────────────────────────────
+
+  it('tier 3: ambiguous intent — the LLM picks a ref and the ladder returns tier llm', async () => {
+    // Two 'Save' buttons: lexical decision is ambiguous, the model breaks the tie.
+    const { observation, index } = makeObservation('obs1', [
+      makeElement('e1', 'button', 'Save'),
+      makeElement('e2', 'button', 'Save'),
+    ]);
+    const { driver, observer, cache } = makeDeps({ observation, index });
+    const models = new FakeModelProvider({
+      responder: { ref: 'e1', confidence: 0.9 },
+    });
+    const attempts: any[] = [];
+    let llmCalls = 0;
+
+    const result = await resolveIntentTarget(makeInput({ intent: 'click the save button' }), attempts, {
+      driver,
+      observer,
+      cache,
+      cdp: null,
+      worlds: null,
+      mainCdpFrameId: '',
+      models: { get: () => models },
+      exec: {
+        taskId: null,
+        humanTimeoutMs: 1000,
+        consumeLlmCall: () => {
+          llmCalls += 1;
+        },
+      },
+    });
+
+    expect(result.tier).toBe('llm');
+    expect(result.element).toMatchObject({ ref: 'e1' });
+    expect(llmCalls).toBe(1);
+    expect(attempts).toContainEqual(expect.objectContaining({ tier: 'llm', ok: true }));
+    expect(driver.cdpPerform).not.toHaveBeenCalled();
+  });
+
+  it('tier 3: the model picks a ref outside the candidate list — ladder continues, no resolution', async () => {
+    const { observation, index } = makeObservation('obs1', [makeElement('e1', 'button', 'Save')]);
+    const { driver, observer, cache } = makeDeps({ observation, index });
+    const attempts: any[] = [];
+    const models = new FakeModelProvider({ responder: { ref: 'e9', confidence: 0.95 } });
+
+    await expect(
+      resolveIntentTarget(makeInput({ intent: 'cancel' }), attempts, {
+        driver,
+        observer,
+        cache,
+        cdp: null,
+        worlds: null,
+        mainCdpFrameId: '',
+        models: { get: () => models },
+      }),
+    ).rejects.toThrow(BosError);
+
+    expect(attempts.some((a) => a.tier === 'llm' && a.ok === true)).toBe(false);
+    expect(models.calls).toBe(1);
+  });
+
+  it('tier 3: no model wired — LLM_DISABLED attempt, tier skipped', async () => {
+    const { observation, index } = makeObservation('obs1', [makeElement('e1', 'button', 'Save')]);
+    const { driver, observer, cache } = makeDeps({ observation, index });
+    const attempts: any[] = [];
+
+    await expect(
+      resolveIntentTarget(makeInput({ intent: 'cancel' }), attempts, {
+        driver,
+        observer,
+        cache,
+        cdp: null,
+        worlds: null,
+        mainCdpFrameId: '',
+        models: null,
+      }),
+    ).rejects.toThrow(BosError);
+
+    expect(attempts).toContainEqual(expect.objectContaining({ tier: 'llm', ok: false, reason: 'LLM_DISABLED' }));
+  });
+
+  it('tier 3: budget exhausted — BUDGET_EXCEEDED propagates, no model call', async () => {
+    const { observation, index } = makeObservation('obs1', [makeElement('e1', 'button', 'Save')]);
+    const { driver, observer, cache } = makeDeps({ observation, index });
+    const attempts: any[] = [];
+    const models = new FakeModelProvider({ responder: { ref: 'e1', confidence: 0.9 } });
+
+    await expect(
+      resolveIntentTarget(makeInput({ intent: 'cancel' }), attempts, {
+        driver,
+        observer,
+        cache,
+        cdp: null,
+        worlds: null,
+        mainCdpFrameId: '',
+        models: { get: () => models },
+        exec: {
+          taskId: null,
+          humanTimeoutMs: 1000,
+          consumeLlmCall: () => {
+            throw new BosError('BUDGET_EXCEEDED', 'spent');
+          },
+        },
+      }),
+    ).rejects.toThrow(BosError);
+
+    expect(models.calls).toBe(0);
+  });
+
+  it('tier 5: a human ref answer resolves with tier human and writes the cache', async () => {
+    const { observation, index } = makeObservation('obs1', [makeElement('e1', 'button', 'Save')]);
+    const { driver, observer, cache } = makeDeps({ observation, index });
+    const attempts: any[] = [];
+    const human = {
+      pause: vi.fn(async () => ({ choice: 'ref', ref: 'e1', observationId: 'obs1' })),
+    };
+
+    const result = await resolveIntentTarget(makeInput({ intent: 'cancel' }), attempts, {
+      driver,
+      observer,
+      cache,
+      cdp: null,
+      worlds: null,
+      mainCdpFrameId: '',
+      human,
+      exec: { taskId: null, humanTimeoutMs: 1000, consumeLlmCall: () => {} },
+    });
+
+    expect(result.tier).toBe('human');
+    expect(result.element).toMatchObject({ ref: 'e1' });
+    expect(cache.put).toHaveBeenCalledTimes(1); // the human taught us
+  });
+
+  it('tier 5: a human done answer returns tier human with done — no execution', async () => {
+    const { observation, index } = makeObservation('obs1', [makeElement('e1', 'button', 'Save')]);
+    const { driver, observer, cache } = makeDeps({ observation, index });
+    const attempts: any[] = [];
+    const human = { pause: vi.fn(async () => ({ choice: 'done' as const })) };
+
+    const result = await resolveIntentTarget(makeInput({ intent: 'cancel' }), attempts, {
+      driver,
+      observer,
+      cache,
+      cdp: null,
+      worlds: null,
+      mainCdpFrameId: '',
+      human,
+      exec: { taskId: null, humanTimeoutMs: 1000, consumeLlmCall: () => {} },
+    });
+
+    expect(result.tier).toBe('human');
+    expect(result.done).toBe(true);
+    expect(cache.put).not.toHaveBeenCalled();
+    expect(driver.cdpPerform).not.toHaveBeenCalled();
+  });
+
+  it('tier 5: no gate wired throws HUMAN_REQUIRED after the llm tier is disabled', async () => {
+    const { observation, index } = makeObservation('obs1', [makeElement('e1', 'button', 'Save')]);
+    const { driver, observer, cache } = makeDeps({ observation, index });
+    const attempts: any[] = [];
+
+    await expect(
+      resolveIntentTarget(makeInput({ intent: 'cancel' }), attempts, {
+        driver,
+        observer,
+        cache,
+        cdp: null,
+        worlds: null,
+        mainCdpFrameId: '',
+        models: null,
+        human: null,
+        exec: { taskId: null, humanTimeoutMs: 1000, consumeLlmCall: () => {} },
+      }),
+    ).rejects.toThrow(BosError);
+
+    expect(attempts).toContainEqual(expect.objectContaining({ tier: 'llm', ok: false, reason: 'LLM_DISABLED' }));
+    expect(attempts).toContainEqual(expect.objectContaining({ tier: 'human', ok: false }));
+  });
+
+  it('tier 5: security challenge — observation.challenge blocks resolution before any tier runs', async () => {
+    const { observation, index } = makeObservation(
+      'obs1',
+      [makeElement('e1', 'button', 'Save')],
+      'https://example.test/',
+      'login',
+    );
+    const { driver, observer, cache } = makeDeps({ observation, index });
+    const attempts: any[] = [];
+
+    await expect(
+      resolveIntentTarget(makeInput(), attempts, {
+        driver,
+        observer,
+        cache,
+        cdp: null,
+        worlds: null,
+        mainCdpFrameId: '',
+        human: { pause: vi.fn(async () => ({ choice: 'abort' as const })) },
+      }),
+    ).rejects.toThrow(BosError);
+
+    // §4 step D: the challenge is surfaced, the human gate is never reached here
+    // (the P7-04 challenge pause is the router's step D, not the ladder's).
+    expect(attempts).toContainEqual(
+      expect.objectContaining({ tier: 'deterministic', ok: false, reason: 'SECURITY_CHALLENGE' }),
     );
     expect(driver.cdpPerform).not.toHaveBeenCalled();
   });
@@ -560,7 +769,10 @@ describe('ActionRouter intent ladder over a real ActionCacheStore (P7-03)', () =
 
     for (const result of runs) {
       expect(result.ok).toBe(false);
-      expect(result.error?.code).toBe('TARGET_NOT_FOUND');
+      // P7-04: with a model wired but answering invalid JSON, the ladder falls
+      // through LLM (invalid) to the human tier; with no gate wired the run
+      // stops with HUMAN_REQUIRED, not the ladder's own TARGET_NOT_FOUND.
+      expect(['TARGET_NOT_FOUND', 'HUMAN_REQUIRED']).toContain(result.error?.code);
     }
     const pageRow = h.cache.list().find((r) => r.path_template === '/checkout');
     expect(pageRow?.status).toBe('invalid');
@@ -611,6 +823,27 @@ describe('ActionRouter intent ladder over a real ActionCacheStore (P7-03)', () =
     // the healed intent must not consult the cache again.
     expect(get).not.toHaveBeenCalled();
     expect(h.models.calls).toBe(0);
+  });
+
+  it('P7-04 canary: no prompt carries a secret or password value', async () => {
+    const h = makeHarness([makeElement('e1', 'textbox', 'Search', 'input')]);
+    // Force the ladder past deterministic (no element matches) so the LLM tier
+    // runs and the fake records its prompt. The value is resolved by the router
+    // AFTER resolution, so the model must never see the secret.
+    await h.router.execute(
+      {
+        type: 'fill',
+        target: { kind: 'intent', text: 'the mystery field' },
+        value: { kind: 'secret', name: 'api_key' },
+      } as any,
+      h.ctx(),
+    );
+
+    for (const request of h.models.requests) {
+      const wire = JSON.stringify(request);
+      expect(wire).not.toContain('sekret');
+      expect(wire).not.toContain('api_key=');
+    }
   });
 
   it('L12 informational: cache-tier action overhead stays inside the 50 ms budget', async () => {

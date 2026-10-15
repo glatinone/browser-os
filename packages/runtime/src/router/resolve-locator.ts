@@ -193,7 +193,7 @@ function buildResolutionFromProbe(
   tier: Tier,
   candidate: ProbeCandidateLike,
   entry: IndexEntry,
-  locator: ElementLocator,
+  _locator: ElementLocator,
 ): Resolution {
   return {
     tier,

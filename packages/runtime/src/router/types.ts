@@ -5,7 +5,7 @@
 // reference so router tests can substitute in-memory fakes for SessionManager,
 // ActionCacheStore, RunStore and the P7-01 security stubs.
 
-import type { PageDriver, ResolvedTarget } from '@browser-os/browser';
+import type { PageDriver } from '@browser-os/browser';
 import type {
   ActionResult,
   BrowserAction,
@@ -139,6 +139,11 @@ export interface Resolution {
    * the tier-1 entry that answered — hit → `recordHit`, false hit → `invalidate`.
    */
   intentLearning?: { query: ActionCacheQuery; key: string | null };
+  /**
+   * §5.3: the human answered `done` and performed the step manually. The router
+   * returns ok with tier `human` without executing; the cache is not written.
+   */
+  done?: boolean;
 }
 
 /** A resolution plus the observation it was derived from (needed for verify and settle). */
@@ -241,6 +246,8 @@ export interface RouterCoreDeps {
   risk: RiskClassifier;
   permissions: PermissionGate;
   human: HumanGate | null;
+  /** P7-04 tier 3: null/absent → the LLM tier is disabled. */
+  models?: ModelsPort | null;
   runs: RunPort;
   cache: ActionCachePort;
   /** The router only emits; a full `EventBus` satisfies it. */

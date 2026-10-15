@@ -52,7 +52,7 @@ export function cacheKey(origin: string, pathTemplate: string, actionType: strin
   return `intent:${origin}:${pathTemplate}:${actionType}:${normalizeIntent(intent)}`;
 }
 
-function pathTemplate(url: string): string {
+function _pathTemplate(url: string): string {
   try {
     const u = new URL(url);
     return u.pathname.replace(/\/[^/]+/g, (m) => (m.match(/\d+/) ? '/:id' : m));

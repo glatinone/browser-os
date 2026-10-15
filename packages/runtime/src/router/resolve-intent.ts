@@ -1,19 +1,16 @@
 import { lexicalDecision, lexicalRank } from '@browser-os/dom';
 import { normalizeIntent, pathTemplate as templatePath } from '@browser-os/memory';
-import type { ActionType, Tier } from '@browser-os/protocol';
+import type { ActionType, IndexEntry, TierAttempt } from '@browser-os/protocol';
 import { BosError } from '../errors.js';
+import type { HumanGate } from '../security/interfaces.js';
 import { DEFAULT_ROUTER_CONSTANTS } from './constants.js';
+import { resolveWithHuman } from './resolve-human.js';
+import { resolveWithLlm } from './resolve-llm.js';
 import { applyLearning, type ResolveLocatorInput, tryResolveLocator } from './resolve-locator.js';
-import type { ActionCachePort, ActionCacheQuery, Resolution } from './types.js';
+import type { ActionCachePort, ActionCacheQuery, ModelsPort, Resolution } from './types.js';
 import { originOfUrl } from './types.js';
 
-interface TierAttemptInput {
-  tier: Tier;
-  ok: boolean;
-  ms: number;
-  reason?: string;
-  score?: number;
-}
+interface TierAttemptInput extends TierAttempt {}
 
 interface IntentDeps {
   driver: ResolveLocatorInput['driver'];
@@ -23,6 +20,16 @@ interface IntentDeps {
   cdp?: unknown;
   worlds?: unknown;
   mainCdpFrameId?: string;
+  /** P7-04 tier 3: absent/null → the LLM tier records LLM_DISABLED and is skipped. */
+  models?: ModelsPort | null;
+  /** P7-04 tier 5: absent → the human tier throws HUMAN_REQUIRED. */
+  human?: HumanGate | null;
+  /** P7-04: budget + human-pause inputs. Absent in the P7-03 unit tests. */
+  exec?: {
+    taskId: string | null;
+    humanTimeoutMs: number;
+    consumeLlmCall: () => void;
+  };
 }
 
 export interface ResolveIntentInput {
@@ -41,9 +48,9 @@ export interface ResolveIntentInput {
 }
 
 /**
- * P7-03: Intent resolution tier ladder (action-router §5 case `intent`).
- * Order: cache → deterministic → (llm P7-04) → (human P7-04). Returns a
- * Resolution or throws BosError('TARGET_NOT_FOUND').
+ * P7-03/P7-04: intent resolution tier ladder (action-router §5 case `intent`).
+ * Order: cache → deterministic → llm (P7-04) → human (P7-04; vision is post-MVP
+ * and stays silent). Returns a Resolution or throws BosError.
  */
 export async function resolveIntentTarget(
   input: ResolveIntentInput,
@@ -86,7 +93,7 @@ export async function resolveIntentTarget(
       attempts.push({ tier: 'cache', ok: true, ms: Date.now() - t0 });
       return { ...resolved, intentLearning: { query, key: cached.key } };
     }
-    attempts.push({ tier: 'cache', ok: false, ms: Date.now() - t0, reason: 'locator_not_found' });
+    attempts.push({ tier: 'cache', ok: false, ms: Date.now() - t0, reason: 'TARGET_NOT_FOUND' });
     // recordMiss bumps consecutive_misses and invalidates past the limit
     // (memory §5), retiring the entry so the ladder does not retry it.
     deps.cache.recordMiss(cached.key);
@@ -97,7 +104,7 @@ export async function resolveIntentTarget(
   const { observation, index } = await deps.observer.capture(input.sessionId, input.pageId);
 
   if (observation.challenge) {
-    attempts.push({ tier: 'deterministic', ok: false, ms: Date.now() - t2, reason: 'challenge' });
+    attempts.push({ tier: 'deterministic', ok: false, ms: Date.now() - t2, reason: 'SECURITY_CHALLENGE' });
     throw new BosError('VERIFICATION_FAILED', 'Security challenge blocks intent resolution');
   }
 
@@ -143,7 +150,86 @@ export async function resolveIntentTarget(
     );
   }
 
+  // Tier 3 — LLM (action-router §5.2). No port or no exec block → LLM_DISABLED;
+  // a BUDGET_EXCEEDED throw from consumeLlmCall propagates (§4.1: budget is a
+  // failure, not a silent skip).
+  const llmEntry = await resolveWithLlm({
+    actionType: input.actionType,
+    intent: input.intent,
+    observation,
+    index,
+    ranked,
+    models: deps.models ?? null,
+    constants,
+    attempts,
+    consumeLlmCall: deps.exec?.consumeLlmCall ?? (() => {}),
+  });
+  if (llmEntry) {
+    const element = observation.elements.find((el) => el.ref === llmEntryLookupRef(index, llmEntry));
+    return {
+      tier: 'llm',
+      entry: llmEntry,
+      element: {
+        ref: llmEntryLookupRef(index, llmEntry),
+        role: element?.role ?? llmEntry.locator.role,
+        name: element?.name ?? llmEntry.locator.name,
+        context: element?.context ?? llmEntry.locator.context,
+      },
+      url: observation.url,
+      origin: originOfUrl(observation.url),
+      disabled: element?.state.disabled === true,
+      intentLearning: { query, key: null },
+    };
+  }
+
+  // Tier 5 — human (action-router §5.3). Vision (tier 4) is post-MVP and stays
+  // silent. Only reachable when an exec block is present (real router calls).
+  if (deps.exec) {
+    const outcome = await resolveWithHuman({
+      actionType: input.actionType,
+      intent: input.intent,
+      sessionId: input.sessionId,
+      taskId: deps.exec.taskId,
+      observation,
+      index,
+      ranked,
+      human: deps.human ?? null,
+      humanTimeoutMs: deps.exec.humanTimeoutMs,
+      attempts,
+      query,
+      cache: deps.cache,
+    });
+    if (outcome.kind === 'done') {
+      // §5.3: the human performed the step; the caller returns ok without executing.
+      return {
+        tier: 'human',
+        entry: HUMAN_DONE_ENTRY,
+        element: { ref: '', role: '', name: '', context: [] },
+        url: observation.url,
+        origin: originOfUrl(observation.url),
+        disabled: false,
+        done: true,
+        intentLearning: { query, key: null },
+      };
+    }
+    if (outcome.kind === 'ref') {
+      return { ...outcome.resolution, intentLearning: { query, key: null } };
+    }
+  }
+
   throw new BosError('TARGET_NOT_FOUND', `Could not resolve intent: ${input.intent}`);
+}
+
+/**
+ * The ref the LLM tier matched: entries are keyed by ref, so the lookup walks
+ * the index once. Returns '' when the index no longer holds the ref (the
+ * caller's `entries.get` in resolve-llm.ts already guards this).
+ */
+function llmEntryLookupRef(index: { entries: Map<string, unknown> }, entry: unknown): string {
+  for (const [ref, candidate] of index.entries) {
+    if (candidate === entry) return ref;
+  }
+  return '';
 }
 
 /**
@@ -161,3 +247,22 @@ export function learnFromResolution(
 }
 
 export type { ActionCacheQuery };
+
+/** §5.3 `done` answer: no element was resolved, execution must be skipped. */
+const HUMAN_DONE_ENTRY: IndexEntry = {
+  backendNodeId: 0,
+  frameId: 'f0',
+  cdpFrameId: '',
+  locator: {
+    v: 1,
+    role: '',
+    name: '',
+    nameIsDynamic: false,
+    tag: '',
+    attrs: {},
+    context: [],
+    cssPath: '',
+    framePath: [],
+    ordinal: 0,
+  },
+};

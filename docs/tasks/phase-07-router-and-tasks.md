@@ -151,7 +151,9 @@ Security pieces (`RiskClassifier`, `PermissionGate`, `HumanGate`) get **stub imp
 **Tests:** ambiguous intent → LLM picks a ref (truthResponder); LLM returns out-of-list ref → next tier; budget exhausted → no call; a human `ref` answer writes the cache; a `done` answer; `login` fixture with the stub gate → `SECURITY_CHALLENGE`.
 
 **Acceptance criteria**
-- [ ] No prompt contains a secret or password value (canary in test)
+- [x] No prompt contains a secret or password value (canary in test) — `router-intent.test.ts` 'P7-04 canary' asserts the recorded model requests never contain the resolved secret or the key name
+- [x] All six card tests written as unit tests (ambiguous → llm ref; out-of-list ref → tier fails; no model → LLM_DISABLED; budget exhausted → no call; human ref → cache written; human done → ok without executing; challenge → SECURITY_CHALLENGE attempt, RejectingHumanGate abort → HUMAN_REQUIRED)
+- Status stays `review` (expert supervision): 611 unit tests pass, build + lint green. The §4-D challenge `HumanGate.pause` wiring lands with P7-07 (router has no step D yet); the ladder already surfaces the challenge as a `SECURITY_CHALLENGE` attempt.
 
 ---
 
