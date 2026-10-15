@@ -8,3 +8,4 @@ export * from './security/stubs.js';
 export * from './sessions/page-registry.js';
 export * from './sessions/session-manager.js';
 export * from './tasks/recorder.js';
+export * from './tasks/replayer.js';
