@@ -2,7 +2,7 @@
 
 **An AI-native browser execution runtime.** It sits between AI agents and your real Chrome or Edge, and makes logged-in web apps programmable, safe and cheap to automate. Repeated tasks get faster each time they run.
 
-> Status: **planning complete, implementation not started** (2026-10-02). Start at [`docs/README.md`](docs/README.md).
+> Status: **implementation in progress (P1-P3 merged into main)**. Start at [`docs/README.md`](docs/README.md).
 
 ## The idea in 30 seconds
 
