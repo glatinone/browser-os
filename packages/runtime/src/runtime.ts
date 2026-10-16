@@ -9,56 +9,55 @@
 
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-
+import { ModelRegistry } from '@browser-os/ai';
 import {
+  type BrowserProvider,
   CdpEndpointProvider,
   ensureProfileDir,
   IsolatedWorlds,
   LaunchProvider,
-  type BrowserProvider,
   type PageDriver,
 } from '@browser-os/browser';
-import { ModelRegistry } from '@browser-os/ai';
 import { PROBE_HELPER_SOURCE } from '@browser-os/dom';
-import {
-  BosError,
-  EventBus,
-  newId,
-  resolveBosHome,
-  systemClock,
-  type BrowserProfile,
-  type BosPlatform,
-  type CdpTransport,
-  type Clock,
-  type Config,
-  type ExecutionContext,
-  type HelperWorlds,
-  type SecretResolver,
-  type Session,
-} from '@browser-os/protocol';
 import {
   ActionCacheStore,
   AuditStore,
+  stats as computeStats,
   openStore,
   ProfileStore,
   RunStore,
   SessionStore,
-  stats as computeStats,
+  type Store,
   TaskStore,
   TrajectoryStore,
-  type Store,
 } from '@browser-os/memory';
+import {
+  BosError,
+  type BosPlatform,
+  type BrowserProfile,
+  type CdpTransport,
+  type Clock,
+  type Config,
+  EventBus,
+  type ExecutionContext,
+  type HelperWorlds,
+  newId,
+  resolveBosHome,
+  type SecretResolver,
+  type Session,
+  systemClock,
+} from '@browser-os/protocol';
+import { defaultConfig, loadConfig } from './config/load-config.js';
 import { Observer } from './observer/observer.js';
-import { ActionRouter } from './router/router.js';
 import { createExecutionContext } from './router/context.js';
+import { ActionRouter } from './router/router.js';
 import type { ModelsPort, PagesPort, RouterCoreDeps, SessionsPort } from './router/types.js';
 import { EnvSecretResolver } from './secrets.js';
-import { PolicyPermissionGate, RejectingHumanGate, StaticRiskClassifier } from './security/stubs.js';
 import type { HumanGate, PermissionGate, RiskClassifier } from './security/interfaces.js';
-import { SessionManager, type ProviderKind } from './sessions/session-manager.js';
+import { PolicyPermissionGate, RejectingHumanGate, StaticRiskClassifier } from './security/stubs.js';
+import { type ProviderKind, SessionManager } from './sessions/session-manager.js';
 import { TrajectoryRecorder } from './tasks/recorder.js';
 import { TaskManager } from './tasks/task-manager.js';
-import { defaultConfig, loadConfig } from './config/load-config.js';
 
 /** What `createRuntime` accepts: a partial config plus the injectable seams. */
 export interface RuntimeOptions {
@@ -120,8 +119,7 @@ export function createRuntime(config: Partial<Config> | undefined = {}, options:
   const events = new EventBus();
 
   // --- memory (ARCHITECTURE §5 line 1): the sqlite store, migrations included.
-  const store: Store | null =
-    options.persist === false ? null : openStore(join(bosHome, 'browser-os.db'));
+  const store: Store | null = options.persist === false ? null : openStore(join(bosHome, 'browser-os.db'));
   if (store !== null) new SessionStore(store.db).markAllLiveClosed(Math.floor(clock.now() / 1000));
 
   const profilesDb = store === null ? null : new ProfileStore(store.db);
@@ -255,7 +253,10 @@ export function createRuntime(config: Partial<Config> | undefined = {}, options:
 
   function runPort() {
     return {
-      insert(ctx: { sessionId: string; taskId?: string | null; origin: string; ts?: number }, result: Parameters<RunStore['insert']>[1]) {
+      insert(
+        ctx: { sessionId: string; taskId?: string | null; origin: string; ts?: number },
+        result: Parameters<RunStore['insert']>[1],
+      ) {
         if (runRows === null) return 0;
         return runRows.insert(ctx, result);
       },
@@ -277,8 +278,7 @@ export function createRuntime(config: Partial<Config> | undefined = {}, options:
 
   // --- tasks (§5 line 11): the manager owns record/replay lifecycle. The
   // store-backed fakes below keep the type honest when `persist: false`.
-  const missingStore = () =>
-    new BosError('INTERNAL', 'this runtime was created without a store (persist: false)', {});
+  const missingStore = () => new BosError('INTERNAL', 'this runtime was created without a store (persist: false)', {});
   const trajectoryPort: TrajectoryStore =
     trajectoryRows ??
     ({
@@ -343,16 +343,24 @@ export function createRuntime(config: Partial<Config> | undefined = {}, options:
   });
 
   // --- profiles API helper (ADR-003: the dir always lives under BOS_HOME).
-  async function createProfile(name: string, channel: BrowserProfile['channel'] = merged.defaultChannel): Promise<BrowserProfile> {
+  async function createProfile(
+    name: string,
+    channel: BrowserProfile['channel'] = merged.defaultChannel,
+  ): Promise<BrowserProfile> {
     const dir = await ensureProfileDir(bosHome, name);
     if (profilesDb === null) {
-      return { id: newId('prf'), name, channel, userDataDir: dir, headless: false, createdAt: Math.floor(clock.now() / 1000), lastUsedAt: null };
+      return {
+        id: newId('prf'),
+        name,
+        channel,
+        userDataDir: dir,
+        headless: false,
+        createdAt: Math.floor(clock.now() / 1000),
+        lastUsedAt: null,
+      };
     }
     const existing = profilesDb.getByName(name);
-    const row =
-      existing === undefined
-        ? profilesDb.create(name, { channel, user_data_dir: dir })
-        : existing;
+    const row = existing === undefined ? profilesDb.create(name, { channel, user_data_dir: dir }) : existing;
     return toProtocolProfile(row);
   }
 
@@ -393,4 +401,3 @@ export function createRuntime(config: Partial<Config> | undefined = {}, options:
     shutdown,
   };
 }
-

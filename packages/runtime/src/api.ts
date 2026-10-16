@@ -18,14 +18,15 @@
 
 import type { ManualLaunchDeps } from '@browser-os/browser';
 import { openManual } from '@browser-os/browser';
+import { serializeLines } from '@browser-os/dom';
 import { stats as computeStats } from '@browser-os/memory';
 import {
-  BosError,
-  newId,
   type ActionResult,
+  BosError,
   type BrowserProfile,
   type HumanAnswer,
   type HumanRequest,
+  newId,
   type PageInfo,
   type PermissionDecisionRecord,
   type PermissionRequest,
@@ -36,10 +37,9 @@ import {
   type Task,
   type Trajectory,
 } from '@browser-os/protocol';
-import { serializeLines } from '@browser-os/dom';
 import { createExecutionContext } from './router/context.js';
-import { EnvSecretResolver, chain, MapSecretResolver } from './secrets.js';
 import type { Runtime } from './runtime.js';
+import { chain, EnvSecretResolver, MapSecretResolver } from './secrets.js';
 
 /** Methods §4 lists but the daemon (P8) — not the runtime — must answer. */
 export const DAEMON_ONLY_METHODS = ['system.hello', 'system.shutdown', 'events.subscribe'] as const;
@@ -179,11 +179,18 @@ export function createRuntimeApi(runtime: Runtime, options: RuntimeApiOptions = 
   }
 
   /** `act`/`upload`: the caller's context, or the running task's (memory §7). */
-  function buildContext(params: { sessionId: string; pageId?: string; taskId?: string; secretValues?: Record<string, string> }) {
+  function buildContext(params: {
+    sessionId: string;
+    pageId?: string;
+    taskId?: string;
+    secretValues?: Record<string, string>;
+  }) {
     const session = liveSession(params.sessionId);
     const pageId = params.pageId ?? session.activePageId;
     if (pageId === null || pageId === undefined) {
-      throw new BosError('PAGE_NOT_FOUND', `session ${session.id} has no active page`, { details: { sessionId: session.id } });
+      throw new BosError('PAGE_NOT_FOUND', `session ${session.id} has no active page`, {
+        details: { sessionId: session.id },
+      });
     }
     let taskParams: Record<string, string> = {};
     let secrets: SecretResolver = envSecrets;
@@ -258,9 +265,10 @@ export function createRuntimeApi(runtime: Runtime, options: RuntimeApiOptions = 
 
     async 'profile.openManual'(params) {
       const profile = liveProfile(params.name);
-      const pid = options.manualLaunch === undefined
-        ?await openManual(profile)
-        :await openManual(profile, options.manualLaunch);
+      const pid =
+        options.manualLaunch === undefined
+          ? await openManual(profile)
+          : await openManual(profile, options.manualLaunch);
       if (pid === null || pid <= 0) {
         throw new BosError('INTERNAL', 'the manual browser did not report a pid', { details: { name: params.name } });
       }
@@ -327,7 +335,10 @@ export function createRuntimeApi(runtime: Runtime, options: RuntimeApiOptions = 
         includeText: params.includeText,
       });
       if (params.format === 'lines') {
-        return { observationId: observation.id, lines: serializeLines(observation, { viewportOnly: params.viewportOnly }) };
+        return {
+          observationId: observation.id,
+          lines: serializeLines(observation, { viewportOnly: params.viewportOnly }),
+        };
       }
       return observation;
     },

@@ -16,22 +16,22 @@
 
 import type { TaskStore, TrajectoryStore } from '@browser-os/memory';
 import {
-  BosError,
-  newId,
   type ActionResult,
+  BosError,
   type BrowserAction,
   type Clock,
   type EventBus,
   type ExecutionContext,
+  newId,
   type SecretResolver,
   type Task,
   type TaskMode,
   type TaskStats,
 } from '@browser-os/protocol';
 import type { ExecuteOptions, TrajectoryRecorderPort } from '../router/types.js';
-import { MapSecretResolver, chain } from '../secrets.js';
+import { chain, MapSecretResolver } from '../secrets.js';
 import type { TrajectoryRecorder } from './recorder.js';
-import { TrajectoryReplayer, type ReplayResult } from './replayer.js';
+import { type ReplayResult, TrajectoryReplayer } from './replayer.js';
 
 /**
  * The per-task recording scope: `TrajectoryRecorderPort` plus the `start`
@@ -65,11 +65,7 @@ export interface TaskManagerDeps {
   /** Active page URL of a session: seeds the recorder's `startUrl`. */
   currentUrl(sessionId: string): string | Promise<string>;
   /** Builds the per-task recorder (one recording scope per task, memory §6.1). */
-  makeRecorder(input: {
-    taskKey: string;
-    params: Record<string, string>;
-    secretNames: string[];
-  }): RecordingScope;
+  makeRecorder(input: { taskKey: string; params: Record<string, string>; secretNames: string[] }): RecordingScope;
   /** Builds the execution context replayed steps run under (one per `task.run`). */
   makeContext(input: {
     sessionId: string;
@@ -181,8 +177,7 @@ export class TaskManager implements TrajectoryRecorderPort {
     }
 
     const liveTrajectory = this.deps.trajectories.getLive(input.key);
-    const resolvedMode: 'record' | 'replay' =
-      mode === 'auto' ? (liveTrajectory === null ? 'record' : 'replay') : mode;
+    const resolvedMode: 'record' | 'replay' = mode === 'auto' ? (liveTrajectory === null ? 'record' : 'replay') : mode;
 
     if (resolvedMode === 'record' && liveTrajectory !== null) {
       throw new BosError(
@@ -370,7 +365,12 @@ export class TaskManager implements TrajectoryRecorderPort {
     return false;
   }
 
-  append(result: ActionResult, ctx: ExecutionContext, intent: string | null, risk: Parameters<TrajectoryRecorderPort['append']>[3]): void {
+  append(
+    result: ActionResult,
+    ctx: ExecutionContext,
+    intent: string | null,
+    risk: Parameters<TrajectoryRecorderPort['append']>[3],
+  ): void {
     if (ctx.taskId === null) return;
     this.live.get(ctx.taskId)?.recorder?.append(result, ctx, intent, risk);
   }
