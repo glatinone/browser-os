@@ -179,12 +179,14 @@ export class TaskManager implements TrajectoryRecorderPort {
     const liveTrajectory = this.deps.trajectories.getLive(input.key);
     const resolvedMode: 'record' | 'replay' = mode === 'auto' ? (liveTrajectory === null ? 'record' : 'replay') : mode;
 
-    if (resolvedMode === 'record' && liveTrajectory !== null) {
-      throw new BosError(
-        'INVALID_REQUEST',
-        `a live trajectory already exists for "${input.key}"; delete it or replay it`,
-        { details: { taskKey: input.key, trajectoryId: liveTrajectory.id } },
-      );
+    // integration §10: an explicit `record` over a live trajectory is ALLOWED —
+    // the live row is replaced when the task ends with success (end() calls
+    // `invalidate(key)` before the recorder's `createRecorded`). Only replay
+    // needs something to replay.
+    if (resolvedMode === 'replay' && liveTrajectory === null) {
+      throw new BosError('TRAJECTORY_NOT_FOUND', `no trajectory to replay for "${input.key}"`, {
+        details: { taskKey: input.key },
+      });
     }
 
     const row = this.deps.tasks.insert({
@@ -247,6 +249,12 @@ export class TaskManager implements TrajectoryRecorderPort {
     const live = this.live.get(taskId) ?? null;
     let trajectoryId = row.trajectory_id;
     if (live !== null && live.recorder !== null) {
+      if (success) {
+        // integration §10: a successful re-recording REPLACES the live row —
+        // invalidate first (history rows survive), then the recorder's
+        // finalize(true) writes the fresh v1 via createRecorded.
+        this.deps.trajectories.invalidate(live.key);
+      }
       const steps = live.recorder.finalize(success);
       if (steps !== null && steps.length > 0) {
         trajectoryId = this.deps.trajectories.getLive(live.key)?.id ?? trajectoryId;
