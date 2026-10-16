@@ -25,6 +25,7 @@ import {
   BosError,
   BrowserProfileSchema,
   OkSchema,
+  RPC_METHOD_NAMES,
   RPC_METHODS,
   SessionSchema,
   TaskSchema,
@@ -32,7 +33,7 @@ import {
   TrajectorySchema,
 } from '@browser-os/protocol';
 import { afterAll, describe, expect, it } from 'vitest';
-import { createRuntimeApi } from '../src/api.js';
+import { createRuntimeApi, DAEMON_ONLY_METHODS } from '../src/api.js';
 import type { Runtime } from '../src/runtime.js';
 import { createRuntime } from '../src/runtime.js';
 
@@ -148,6 +149,13 @@ describe('RuntimeApi smoke over a fixture with a fake model (P7-07)', () => {
     } finally {
       await runtime.shutdown();
     }
+  });
+
+  it('every protocol §4 method except the daemon trio exists on RuntimeApi (AC: names match RPC_METHODS)', async () => {
+    const api = fakeRuntime().api;
+    const expected = RPC_METHOD_NAMES.filter((m) => !(DAEMON_ONLY_METHODS as readonly string[]).includes(m));
+    expect(expected.length).toBe(33); // 36 RPC methods minus the daemon trio
+    for (const name of expected) expect(typeof (api as unknown as Record<string, unknown>)[name]).toBe('function');
   });
 
   it('store refusals are BosErrors with routed codes (unknown task, key, session)', async () => {

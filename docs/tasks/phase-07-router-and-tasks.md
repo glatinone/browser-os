@@ -255,7 +255,7 @@ pre-existing warnings, boundaries OK), `pnpm test:browser` (74 passed).
 **Tests:** API smoke over a fixture with a fake model; task lifecycle; config loading with defaults.
 
 **Acceptance criteria**
-- [ ] `RuntimeApi` method names and param/result types match `RPC_METHODS`
+- [x] `RuntimeApi` method names and param/result types match `RPC_METHODS` — every method is keyed by the literal `'x.y'` string with `RpcParams<M>`/`RpcResult<M>` derived from `RPC_METHODS` itself (compile-time pin); a parity test asserts no §4 method (minus the daemon trio) is missing from `api.ts`
 
 ---
 
