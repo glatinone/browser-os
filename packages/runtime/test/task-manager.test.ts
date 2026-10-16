@@ -43,7 +43,13 @@ const CLICK: BrowserAction = { type: 'click', target: { kind: 'locator', locator
 
 function steps(): TrajectoryStep[] {
   return [
-    { index: 0, action: { type: 'navigate', url: 'https://shop.test/buy/{{product}}' }, intent: null, pre: { urlPattern: '/' }, risk: 'low' },
+    {
+      index: 0,
+      action: { type: 'navigate', url: 'https://shop.test/buy/{{product}}' },
+      intent: null,
+      pre: { urlPattern: '/' },
+      risk: 'low',
+    },
     { index: 1, action: CLICK, intent: 'the search box', pre: { urlPattern: '/buy/**' }, risk: 'medium' },
   ];
 }
@@ -320,7 +326,14 @@ describe('TaskManager.run — replay end-to-end (memory §6.2 + §7)', () => {
     expect(h.routerCalls.map((c) => c.action.type)).toEqual(['navigate', 'click']);
     expect(h.routerCalls[1]?.opts).toEqual({ healIntent: 'the search box', recordedRisk: 'medium' });
     // usage of every step landed on the task (requirement 1: stats aggregation)
-    expect(task.stats).toMatchObject({ actions: 2, llmCalls: 1, inputTokens: 40, outputTokens: 8, cacheHits: 2, healedSteps: 0 });
+    expect(task.stats).toMatchObject({
+      actions: 2,
+      llmCalls: 1,
+      inputTokens: 40,
+      outputTokens: 8,
+      cacheHits: 2,
+      healedSteps: 0,
+    });
     expect(task.trajectoryId).toBeNull(); // tasks.trajectory_id is stamped by a *recording* end, not a replay (memory §7)
     // no recorder on a replay task (S13 keeps the two scopes apart)
     expect(h.recorderCalls).toEqual([]);

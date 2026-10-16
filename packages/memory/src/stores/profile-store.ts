@@ -42,7 +42,7 @@ export class ProfileStore {
       user_data_dir: '',
     },
   ): Profile {
-    const id = randomUUID();
+    const id = `prf_${randomUUID()}`;
     const now = Math.floor(Date.now() / 1000);
     try {
       this.stmtCreate.run(id, name, opts.channel, opts.user_data_dir, opts.headless ? 1 : 0, now, now);
