@@ -338,6 +338,8 @@ export class TaskManager implements TrajectoryRecorderPort {
     try {
       replay = await replayer.replay({ trajectory, params }, ctx);
     } catch (error) {
+      // Cancelled / thrown: the replayer never reached its bookkeeping, so
+      // the run is recorded here exactly once (memory §6.2).
       const code = error instanceof BosError ? error.code : 'INTERNAL';
       await this.end(task.id, false, code);
       this.deps.trajectories.recordRun(trajectory.id, { success: false });
@@ -351,13 +353,11 @@ export class TaskManager implements TrajectoryRecorderPort {
     }
     if (replay.ok) return this.end(task.id, true);
 
-    const errorCode = replay.error.code as (typeof replay.error)['code'];
-    const ended = await this.end(task.id, false, String(errorCode));
-    if (replay.recorded === false && replay.trajectory === undefined) {
-      // Pre-flight failures never reached recordRun; memory §6.2 keeps them
-      // from burning the trajectory — nothing to do here.
-    }
-    return ended;
+    // Failed replay: the replayer already did the §6.2 bookkeeping where it
+    // applies — `failStep` called `recordRun(false)`, and pre-flight or
+    // challenge-shaped failures (`recorded === false`) deliberately must NOT
+    // count against the trajectory. Nothing to record here.
+    return this.end(task.id, false, String(replay.error.code));
   }
 
   // --- TrajectoryRecorderPort: the router hands every recorded action here,
