@@ -127,6 +127,10 @@ export async function startServer(options: StartServerOptions): Promise<RunningS
     wss.handleUpgrade(req, socket, head, (ws) => {
       connections.add(ws);
       ws.on('close', () => connections.delete(ws));
+      // A receiver error (oversized frame per S7, malformed stream) must kill
+      // this connection only — never the daemon. `ws` closes it after the
+      // error; the listener exists so the event has somewhere to go.
+      ws.on('error', () => connections.delete(ws));
       ws.on('message', (data: Buffer | string, isBinary: boolean) => {
         if (isBinary) {
           reply(ws, errorFrame(null, 'frames must be JSON text'));
