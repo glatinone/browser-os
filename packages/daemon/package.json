@@ -16,6 +16,10 @@
   },
   "dependencies": {
     "@browser-os/protocol": "workspace:*",
-    "@browser-os/runtime": "workspace:*"
+    "@browser-os/runtime": "workspace:*",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.2"
   }
 }
