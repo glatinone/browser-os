@@ -121,7 +121,7 @@ Phase 7 work proceeds in parallel: these four are inputs Phase 7 reads but does 
 | P7-08 | **M3** vertical slice e2e (the thesis) | P7-07 | review | todo |
 | **Phase 8** | **Daemon / SDK / CLI** | | | |
 | P8-01 | WebSocket server + JSON-RPC dispatcher | P1-03, P7-07 | review | done |
-| P8-02 | Method handlers + event subscriptions | P8-01 | cheap | todo |
+| P8-02 | Method handlers + event subscriptions | P8-01 | cheap | done |
 | P8-03 | Daemon lifecycle | P8-02 | cheap | todo |
 | P8-04 | Token auth + file permissions | P8-01 | expert | todo |
 | P8-05 | SDK client | P8-04 | cheap | todo |

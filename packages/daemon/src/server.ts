@@ -23,6 +23,7 @@ import { BosError, type BosEvent, JsonRpcNotificationSchema, PROTOCOL_VERSION } 
 import { WebSocket, WebSocketServer } from 'ws';
 import { createDispatcher, type RpcApi } from './dispatch.js';
 import type { RequestLogger } from './log.js';
+import { type ConnectionHandle, runWithConnection, type SubscriptionHub } from './subscriptions.js';
 
 /** Max frame size accepted from a client (SECURITY.md S7 = 8 MB). */
 export const MAX_PAYLOAD_BYTES = 8 * 1024 * 1024;
@@ -47,6 +48,16 @@ export interface StartServerOptions {
   host?: string;
   logger?: RequestLogger;
   validateResults?: boolean;
+  /**
+   * P8-02 — install a per-connection subscription hub. With it present:
+   *   * `send(event)` delivers only to connections whose `events.subscribe`
+   *     filters match (subscribe-only; an unsubscribed socket gets nothing).
+   *   * every dispatch runs inside `runWithConnection(handle, ...)`, so the
+   *     `events.subscribe` handler (from `createDaemonApi`) can see which
+   *     socket asked.
+   * Left undefined, the P8-01 contract holds: `send` fans out to everyone.
+   */
+  subscriptions?: SubscriptionHub;
 }
 
 export interface RunningServer {
@@ -75,6 +86,10 @@ export async function startServer(options: StartServerOptions): Promise<RunningS
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   });
 
+  // P8-02: when a hub is installed, `send` routes through subscription
+  // filters; without one the P8-01 unconditional fan-out is preserved.
+  const hub = options.subscriptions;
+
   const httpServer = createServer((_req, res) => {
     res.writeHead(404, { 'content-type': 'text/plain' });
     res.end('not found');
@@ -82,6 +97,7 @@ export async function startServer(options: StartServerOptions): Promise<RunningS
 
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD_BYTES });
   const connections = new Set<WebSocket>();
+  let nextConnectionId = 0;
 
   httpServer.on('upgrade', (req, socket, head) => {
     void handleUpgrade(req, socket, head);
@@ -125,8 +141,21 @@ export async function startServer(options: StartServerOptions): Promise<RunningS
     }
     if (req.socket.destroyed) return;
     wss.handleUpgrade(req, socket, head, (ws) => {
+      // P8-02: every live socket is a hub connection with a stable id, so
+      // `events.subscribe` (current socket) and `send` (filtered fan-out)
+      // agree on who is who.
+      const connectionId = `conn_${nextConnectionId}`;
+      nextConnectionId += 1;
+      const handle: ConnectionHandle = {
+        id: connectionId,
+        send: (frame: string) => reply(ws, frame),
+      };
+      hub?.attach(handle);
       connections.add(ws);
-      ws.on('close', () => connections.delete(ws));
+      ws.on('close', () => {
+        connections.delete(ws);
+        hub?.detach(handle.id); // subscriptions die with the connection (card bullet)
+      });
       // A receiver error (oversized frame per S7, malformed stream) must kill
       // this connection only — never the daemon. `ws` closes it after the
       // error; the listener exists so the event has somewhere to go.
@@ -136,8 +165,13 @@ export async function startServer(options: StartServerOptions): Promise<RunningS
           reply(ws, errorFrame(null, 'frames must be JSON text'));
           return;
         }
-        void dispatcher
-          .handleMessage(typeof data === 'string' ? data : data.toString('utf8'))
+        // The whole dispatch runs with this socket as the current
+        // connection, so events.subscribe registers against the right one
+        // even while other sockets are mid-request (AsyncLocalStorage).
+        const promise = runWithConnection(handle, () =>
+          dispatcher.handleMessage(typeof data === 'string' ? data : data.toString('utf8')),
+        );
+        void promise
           .then((response) => {
             if (response !== null) reply(ws, response);
           })
@@ -184,6 +218,11 @@ export async function startServer(options: StartServerOptions): Promise<RunningS
       // wire must never carry one (protocol §3 pins the notification shape).
       const notification = JsonRpcNotificationSchema.parse({ jsonrpc: '2.0', method: 'event', params: event });
       const frame = JSON.stringify(notification);
+      if (hub !== undefined) {
+        // P8-02 mode: only subscribers with a matching filter receive it.
+        hub.publish(event, frame);
+        return;
+      }
       for (const ws of connections) reply(ws, frame);
     },
     async close(): Promise<void> {
