@@ -2,7 +2,7 @@
 
 Browser-OS is a local-first TypeScript runtime between AI agents and a real Chrome/Edge browser. It compresses pages into semantic element lists, routes every action through the cheapest reliable mechanism (cache → deterministic → small LLM → human), and records task trajectories so repeated tasks run with zero LLM calls.
 
-**Project status (2026-10-02):** planning complete, implementation not started. Next task: `P0-01`.
+**Project status:** implementation in progress (Phases P0-P6 merged, Phase 7 router under way). Live status per task: [tasks/README.md](tasks/README.md).
 
 ---
 
